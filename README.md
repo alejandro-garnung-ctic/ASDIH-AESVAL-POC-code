@@ -110,3 +110,4 @@ sudo netstat -tulpn | grep 8501
 - Meter la ecuación correcta de los modelos y sus parámetros, bien diferenciados en /models
 - Arreglar la generación de pdf
 - Arreglar la descarga de la plantilla tipo, o bien ponerla como asset y añadirla estáticamente como recurso
+- Eliminar los .py del models/? Igual teniendo el yaml no hace falta ya
