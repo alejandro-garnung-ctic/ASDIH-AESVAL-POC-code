@@ -1,0 +1,10 @@
+version: "1.0"
+fecha_actualizacion: "2025-01-10"
+
+modelos:
+  municipio_pequeno:
+    nombre: "Municipios pequeños (< 5,000 hab)"
+    coeficientes:
+      intercepto: 1000.0
+      superficie: 150.5
+      antiguedad: -10.2
