@@ -1,10 +1,130 @@
-version: "1.0"
+version: "2.0"
 fecha_actualizacion: "2025-01-10"
+descripcion: "Modelos de tasación basados en análisis econométrico ECO 805"
+
+variables:
+  superficie: "Superficie construida en m²"
+  antiguedad: "Años desde construcción"
+  dormitorios: "Número de dormitorios"
+  banos: "Número de baños"
+  calefaccion: "Tiene calefacción (Sí/No)"
+  ascensor: "Tiene ascensor (Sí/No)"
+  calidad_alta: "Calidad constructiva alta (Sí/No)"
+  estado_alto: "Estado de conservación alto (Sí/No)"
+  planta: "Planta en la que se ubica"
+  vivienda_nueva: "Menos de 5 años (Sí/No)"
 
 modelos:
-  municipio_pequeno:
-    nombre: "Municipios pequeños (< 5,000 hab)"
+  testigos_menos_10000:
+    nombre: "Municipios pequeños (< 10,000 hab) - Base Testigos"
+    rango_poblacion: "menos_10000"
+    tipo: "testigos"
+    r2: 0.78
     coeficientes:
-      intercepto: 1000.0
-      superficie: 150.5
-      antiguedad: -10.2
+      intercepto: 1678.676
+      vivienda_nueva: 170.659
+      superficie: -4.145
+      calefaccion: 22.732
+      dormitorios: -30.248
+      banos: 90.862
+      calidad_alta: 119.123
+      ascensor: 116.861
+      planta: 5.989
+
+  testigos_10000_50000:
+    nombre: "Municipios medianos (10,000-50,000 hab) - Base Testigos"
+    rango_poblacion: "10000_50000"
+    tipo: "testigos"
+    r2: 0.82
+    coeficientes:
+      intercepto: 1045.291
+      vivienda_nueva: 260.990
+      superficie: -2.197
+      calefaccion: 17.419
+      dormitorios: -93.490
+      banos: 176.626
+      calidad_alta: 130.442
+      ascensor: 192.908
+      planta: 3.081
+
+  testigos_50000_200000:
+    nombre: "Municipios grandes (50,000-200,000 hab) - Base Testigos"
+    rango_poblacion: "50000_200000"
+    tipo: "testigos"
+    r2: 0.85
+    coeficientes:
+      intercepto: 1345.272
+      vivienda_nueva: 338.113
+      superficie: -0.583
+      calefaccion: 22.509
+      dormitorios: -160.493
+      banos: 226.590
+      calidad_alta: 168.642
+      ascensor: 328.620
+      planta: 9.668
+
+  testigos_mas_200000:
+    nombre: "Municipios metropolitanos (> 200,000 hab) - Base Testigos"
+    rango_poblacion: "mas_200000"
+    tipo: "testigos"
+    r2: 0.88
+    coeficientes:
+      intercepto: 1410.693
+      vivienda_nueva: 161.305
+      superficie: 7.435
+      calefaccion: 140.034
+      dormitorios: -379.047
+      banos: 290.346
+      calidad_alta: 418.627
+      ascensor: 584.554
+      planta: 30.395
+
+  # Modelos de tasa de descuento
+  tasa_descuento:
+    nombre: "Modelo Tasa de Descuento - Base Testigos 2018-2024"
+    tipo: "tasa_descuento"
+    r2: 0.76
+    coeficientes:
+      intercepto: 0.048
+      superficie: 0.00008
+      antiguedad: 0.00012
+      banos: -0.006
+      dormitorios: 0.002
+      calidad_alta: -0.002
+      estado_alto: -0.004
+      ascensor: -0.007
+      planta: -0.0003
+
+  prima_riesgo:
+    nombre: "Modelo Prima de Riesgo - Base Testigos 2018-2024"
+    tipo: "prima_riesgo"
+    r2: 0.71
+    coeficientes:
+      intercepto: 0.037
+      antiguedad: 0.00009
+      banos: -0.005
+      dormitorios: 0.002
+      estado_alto: -0.004
+      ascensor: -0.008
+
+factores_correccion:
+  estado_conservacion:
+    muy_deficiente: 0.70
+    deficiente: 0.80
+    regular: 0.90
+    bueno: 1.00
+    muy_bueno: 1.10
+    excelente: 1.20
+  
+  calidad_constructiva:
+    basica: 0.85
+    media: 1.00
+    alta: 1.15
+    lujo: 1.35
+
+  tipo_inmueble:
+    vivienda_unifamiliar: 1.10
+    vivienda_bloque: 1.00
+    local_comercial: 0.95
+    oficina: 1.05
+    industrial: 0.90
