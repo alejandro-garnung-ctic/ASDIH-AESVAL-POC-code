@@ -194,12 +194,12 @@ def mostrar_header():
     with col2:
         st.markdown("""
         <div style='text-align: center; padding: 1rem 0;'>
-            <h1 style='color: #1f77b4; margin-bottom: 0.5rem; font-size: 2.5rem;'>
-                🏠 SISTEMA DE TASACIÓN ECO 805
-            </h1>
-            <h3 style='color: #666; margin-top: 0; font-weight: 300;'>
+            <h2 style='color: #1f77b4; margin-bottom: 0.5rem; font-size: 2.5rem;'>
+                🏠 SISTEMA DE TASACIÓN
+            </h2>
+            <h4 style='color: #666; margin-top: 0; font-weight: 300;'>
                 Modelos Econométricos Basados en Análisis de Regresión
-            </h3>
+            </h4>
         </div>
         """, unsafe_allow_html=True)
     
