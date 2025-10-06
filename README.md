@@ -103,3 +103,10 @@ sudo lsof -i :8501
 # O usar netstat
 sudo netstat -tulpn | grep 8501
 ```
+
+# TODO
+
+- Hacer un comando agnóstico a SO para lanzar el contenedor sea con .sh o .bat
+- Meter la ecuación correcta de los modelos y sus parámetros, bien diferenciados en /models
+- Arreglar la generación de pdf
+- Arreglar la descarga de la plantilla tipo, o bien ponerla como asset y añadirla estáticamente como recurso

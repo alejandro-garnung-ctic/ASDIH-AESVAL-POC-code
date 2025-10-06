@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código
 COPY src/ ./src/
 COPY config/ ./config/
+COPY assets/ ./assets/
 COPY start.sh /app/start.sh
 
 # Permisos para el script Linux
