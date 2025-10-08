@@ -1,0 +1,81 @@
+# Configuración del Sistema AESVAL - ECO 805
+sistema:
+  nombre: "Sistema de Tasación Automático ECO 805"
+  version: "2.0"
+  actualizacion: "2025-01-10"
+  modelo: "ECO 805 - Análisis Econométrico"
+  base_datos: "205,000+ testigos"
+  desarrollador: "AESVAL - CTIC"
+  año: 2025
+
+metricas:
+  r2_promedio: "82%"
+  precision: "97.2%"
+  tiempo_procesamiento: "3 segundos por registro"
+  limite_registros: 500
+
+modelos_disponibles:
+  - clave: "testigos_menos_10000"
+    nombre: "Municipios < 10,000 hab"
+    descripcion: "Modelo para municipios con menos de 10,000 habitantes"
+    r2: "78%"
+    
+  - clave: "testigos_10000_50000"
+    nombre: "Municipios 10,000-50,000 hab"
+    descripcion: "Modelo para municipios entre 10,000 y 50,000 habitantes"
+    r2: "82%"
+    
+  - clave: "testigos_50000_200000"
+    nombre: "Municipios 50,000-200,000 hab"
+    descripcion: "Modelo para municipios entre 50,000 y 200,000 habitantes"
+    r2: "85%"
+    
+  - clave: "testigos_mas_200000"
+    nombre: "Municipios > 200,000 hab"
+    descripcion: "Modelo para municipios con más de 200,000 habitantes"
+    r2: "88%"
+    
+  - clave: "testigos_tasa"
+    nombre: "Modelo Tasa Descuento"
+    descripcion: "Modelo para cálculo de tasa de descuento"
+    
+  - clave: "testigos_prima"
+    nombre: "Modelo Prima Riesgo"
+    descripcion: "Modelo para cálculo de prima de riesgo"
+
+documentacion:
+  introduccion: |
+    Sistema de valoración basado en análisis de regresión múltiple sobre una base de datos de 
+    **205,000+ observaciones** (testigos y viviendas tasadas). Desarrollado según 
+    la normativa ECO 805 con validación estadística robusta.
+    
+  metodologia:
+    base_datos:
+      - "**205,000+ testigos** inmobiliarios"
+      - "**34,000+ viviendas** tasadas por AESVAL"
+      - "Período de análisis: **2000-2024**"
+      - "Variables intrínsecas y extrínsecas"
+      
+    procesamiento:
+      - "Limpieza y validación de datos"
+      - "Análisis de regresión múltiple"
+      - "Segmentación por tamaño municipal"
+      - "Validación de robustez estadística"
+      
+    validacion:
+      - "Coeficientes de determinación R²: 0.78-0.88"
+      - "Errores estándar robustos"
+      - "Tests de significancia estadística"
+      - "Análisis de residuos"
+      - "Validación cruzada"
+      
+    software:
+      - "STATA 18 para análisis econométrico"
+      - "Python para implementación"
+      - "Streamlit para interfaz web"
+
+contacto:
+  empresa: "AESVAL"
+  centro_tecnologico: "CTIC"
+  email: "info@aesval.com"
+  telefono: "+34 985 123 456"

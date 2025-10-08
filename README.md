@@ -109,5 +109,7 @@ sudo netstat -tulpn | grep 8501
 - Hacer un comando agnóstico a SO para lanzar el contenedor sea con .sh o .bat
 - Meter la ecuación correcta de los modelos y sus parámetros, bien diferenciados en /models
 - Arreglar la generación de pdf
-- Arreglar la descarga de la plantilla tipo, o bien ponerla como asset y añadirla estáticamente como recurso
+- Arreglar la descarga de la plantilla tipo, o bien ponerla como asset y añadirla estáticamente como recurso. Hacer la plantilla ya en excel, no hacerla por código en lo de col2...
 - Eliminar los .py del models/? Igual teniendo el yaml no hace falta ya
+- Cambiar completamente el enfoque del código para que cómo se calcule el valor, y los parámetros del modelo, no estén en el código. Ello se especificaría directamente en los archivos json o yaml de config (ecuación, parámetros, modelo...), así todo queda configurable incluso en tiempo real, sin necesidad de recompilar para añadir o quitar parámetros o ecuaciones o modelos. Esto resolvería problema de si queremos cambiar e.g. que Los modelos de valor muestran: Dnueva, SU, DCA, ND, NB, CC_Alta, DAS, PLbis y Los modelos de Tasa/Prima muestran: SU, antig, NB, ND, CC_Alta, EC_Alto, rehab, DAS, PLbis
+- DUDA: El usuario solo debería escoger entre los modelos de testigos en función de la población? Es decir, podría escoger también el modelo de prima o el de tasa? O estos dos último SIEMPRE se deberían calcular junto con el escogido de los testigos por población?

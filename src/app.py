@@ -2,21 +2,115 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Tuple
-import yaml
 import io
 import base64
 from datetime import datetime
 import json
+import yaml
+import os
 
 current_year = datetime.now().year
 
 # Configuración de página
 st.set_page_config(
-    page_title="AESVAL - Sistema de Tasación Inteligente ECO 805",
+    page_title="AESVAL - Sistema de Tasación Automático ECO 805",
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Ocultar menú de Streamlit
+hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+def cargar_configuracion_sistema():
+    """Carga la configuración del sistema desde archivo YAML"""
+    try:
+        with open('config/info.yaml', 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        st.error("❌ No se encontró el archivo de configuración del sistema: config/info.yaml")
+        # Configuración por defecto
+        return {
+            'sistema': {
+                'nombre': 'Sistema de Tasación Automático ECO 805',
+                'version': '2.0',
+                'actualizacion': '2025-01-10',
+                'modelo': 'ECO 805 - Análisis Econométrico',
+                'base_datos': '205,000+ testigos',
+                'desarrollador': 'AESVAL - CTIC',
+                'año': 2025
+            },
+            'metricas': {
+                'r2_promedio': '82%',
+                'precision': '97.2%',
+                'tiempo_procesamiento': '3 segundos por registro',
+                'limite_registros': 500
+            },
+            'modelos_disponibles': [
+                {'clave': 'testigos_menos_10000', 'nombre': 'Municipios < 10,000 hab'},
+                {'clave': 'testigos_10000_50000', 'nombre': 'Municipios 10,000-50,000 hab'},
+                {'clave': 'testigos_50000_200000', 'nombre': 'Municipios 50,000-200,000 hab'},
+                {'clave': 'testigos_mas_200000', 'nombre': 'Municipios > 200,000 hab'},
+                {'clave': 'testigos_tasa', 'nombre': 'Modelo Tasa Descuento'},
+                {'clave': 'testigos_prima', 'nombre': 'Modelo Prima Riesgo'}
+            ]
+        }
+    except Exception as e:
+        st.error(f"❌ Error cargando configuración del sistema: {e}")
+        return None
+
+def cargar_modelos_json():
+    """Carga los modelos desde archivos JSON en config/"""
+    modelos = {}
+    
+    # Mapeo exacto según los nombres de tus archivos
+    mapeo_modelos = {
+        'modelo_Testigos_menos_de_10000': 'testigos_menos_10000',
+        'modelo_Testigos_10000-50000': 'testigos_10000_50000', 
+        'modelo_Testigos_50000-200000': 'testigos_50000_200000',
+        'modelo_Testigos_más_de_200000': 'testigos_mas_200000',
+        'modelo_Testigos_Prima': 'testigos_prima',
+        'modelo_Testigos_Tasa': 'testigos_tasa'
+    }
+    
+    for archivo, clave in mapeo_modelos.items():
+        try:
+            ruta = f"config/{archivo}.json"
+            if os.path.exists(ruta):
+                with open(ruta, 'r', encoding='utf-8') as f:
+                    modelos[clave] = json.load(f)
+                    print(f"✅ Modelo {clave} cargado correctamente")
+            else:
+                # Buscar archivos similares
+                archivos_disponibles = [f for f in os.listdir('config') if f.endswith('.json')]
+                archivo_encontrado = None
+                
+                # Buscar coincidencias aproximadas
+                for archivo_disp in archivos_disponibles:
+                    archivo_sin_ext = archivo_disp.replace('.json', '')
+                    if archivo_sin_ext.lower().replace('_', '-').replace('á', 'a') == archivo.lower().replace('_', '-').replace('á', 'a'):
+                        archivo_encontrado = archivo_disp
+                        break
+                
+                if archivo_encontrado:
+                    ruta_alternativa = f"config/{archivo_encontrado}"
+                    with open(ruta_alternativa, 'r', encoding='utf-8') as f:
+                        modelos[clave] = json.load(f)
+                    st.success(f"✅ Modelo {clave} cargado desde {archivo_encontrado}")
+                else:
+                    st.warning(f"⚠️ No se encontró {ruta} (archivos disponibles: {', '.join(archivos_disponibles)})")
+                    
+        except Exception as e:
+            st.error(f"❌ Error cargando {archivo}: {e}")
+    
+    return modelos
 
 def get_image_base64(path):
     """Carga imágenes y las convierte a base64"""
@@ -37,72 +131,107 @@ def get_image_base64(path):
             continue
     return None
 
+def es_modelo_tasa_o_prima(nombre_modelo: str) -> bool:
+    """Determina si el modelo es de Tasa o Prima"""
+    return 'tasa' in nombre_modelo.lower() or 'prima' in nombre_modelo.lower()
+
+def es_modelo_valor(nombre_modelo: str) -> bool:
+    """Determina si el modelo es de valor normal"""
+    return not es_modelo_tasa_o_prima(nombre_modelo)
+
 class ModeloTasacion:
     """Clase para gestionar los modelos de tasación"""
     
-    def __init__(self, config: Dict):
-        self.config = config
-        self.modelos = config.get('modelos', {})
-        self.factores = config.get('factores_correccion', {})
+    def __init__(self, modelos_json: Dict):
+        self.modelos = modelos_json
     
-    def obtener_modelo_por_poblacion(self, poblacion: int) -> Optional[Dict]:
-        """Obtiene el modelo adecuado según el tamaño de población"""
-        if poblacion < 10000:
-            return self.modelos.get('testigos_menos_10000')
-        elif 10000 <= poblacion < 50000:
-            return self.modelos.get('testigos_10000_50000')
-        elif 50000 <= poblacion < 200000:
-            return self.modelos.get('testigos_50000_200000')
-        else:
-            return self.modelos.get('testigos_mas_200000')
+    def obtener_modelos_disponibles(self) -> List[Tuple[str, str]]:
+        """Retorna la lista de modelos disponibles con nombres legibles desde YAML"""
+        # Intentar obtener desde la configuración YAML
+        if hasattr(st.session_state, 'config_sistema') and st.session_state.config_sistema:
+            modelos_config = st.session_state.config_sistema.get('modelos_disponibles', [])
+            disponibles = []
+            for modelo_config in modelos_config:
+                clave = modelo_config.get('clave')
+                nombre = modelo_config.get('nombre')
+                if clave in self.modelos:  # Solo incluir modelos que estén cargados
+                    disponibles.append((clave, nombre))
+            
+            if disponibles:
+                return disponibles
+        
+        # Fallback a nombres por defecto
+        nombres_legibles = {
+            'testigos_menos_10000': 'Municipios < 10,000 hab',
+            'testigos_10000_50000': 'Municipios 10,000-50,000 hab',
+            'testigos_50000_200000': 'Municipios 50,000-200,000 hab',
+            'testigos_mas_200000': 'Municipios > 200,000 hab',
+            'testigos_tasa': 'Modelo Tasa Descuento',
+            'testigos_prima': 'Modelo Prima Riesgo'
+        }
+        
+        disponibles = []
+        for clave in self.modelos.keys():
+            nombre = nombres_legibles.get(clave, clave)
+            disponibles.append((clave, nombre))
+        
+        return disponibles
+
+    def obtener_modelo(self, nombre_modelo: str) -> Optional[Dict]:
+        """Obtiene el modelo por su nombre"""
+        return self.modelos.get(nombre_modelo)
     
-    def calcular_valor_m2(self, datos: Dict, modelo: Dict) -> Tuple[float, Dict]:
+    def calcular_valor_m2(self, datos: Dict, modelo: Dict, codigo_municipio: str) -> Tuple[float, Dict]:
         """Calcula el valor por m² usando el modelo especificado"""
-        coef = modelo['coeficientes']
+        coef_municipio = modelo['coeficientes_municipios'].get(str(codigo_municipio), 0)
+        coef_variables = modelo['coeficientes_variables']
+        _cons = modelo['_cons']
+        
         contribuciones = {}
         
-        # Valor base del municipio (intercepto)
-        valor_base = coef['intercepto']
+        # Valor base (constante + efecto municipio)
+        valor_base = _cons + coef_municipio
         contribuciones['valor_base'] = valor_base
+        contribuciones[f'municipio_{codigo_municipio}'] = coef_municipio
         
-        # Aplicar coeficientes según variables
-        if datos.get('vivienda_nueva') and 'vivienda_nueva' in coef:
-            contrib = coef['vivienda_nueva']
+        # Aplicar coeficientes según variables disponibles
+        if datos.get('vivienda_nueva') and 'Dnueva' in coef_variables and coef_variables['Dnueva'] is not None:
+            contrib = coef_variables['Dnueva']
             valor_base += contrib
             contribuciones['vivienda_nueva'] = contrib
         
-        if 'superficie' in coef and datos.get('superficie'):
-            contrib = coef['superficie'] * datos['superficie']
+        if 'SU' in coef_variables and coef_variables['SU'] is not None and datos.get('superficie'):
+            contrib = coef_variables['SU'] * datos['superficie']
             valor_base += contrib
             contribuciones['superficie'] = contrib
         
-        if datos.get('calefaccion') and 'calefaccion' in coef:
-            contrib = coef['calefaccion']
+        if datos.get('calefaccion') and 'DCA' in coef_variables and coef_variables['DCA'] is not None:
+            contrib = coef_variables['DCA']
             valor_base += contrib
             contribuciones['calefaccion'] = contrib
         
-        if 'dormitorios' in coef and datos.get('dormitorios'):
-            contrib = coef['dormitorios'] * datos['dormitorios']
+        if 'ND' in coef_variables and coef_variables['ND'] is not None and datos.get('dormitorios'):
+            contrib = coef_variables['ND'] * datos['dormitorios']
             valor_base += contrib
             contribuciones['dormitorios'] = contrib
         
-        if 'banos' in coef and datos.get('banos'):
-            contrib = coef['banos'] * datos['banos']
+        if 'NB' in coef_variables and coef_variables['NB'] is not None and datos.get('banos'):
+            contrib = coef_variables['NB'] * datos['banos']
             valor_base += contrib
             contribuciones['banos'] = contrib
         
-        if datos.get('calidad_alta') and 'calidad_alta' in coef:
-            contrib = coef['calidad_alta']
+        if datos.get('calidad_alta') and 'CC_Alta' in coef_variables and coef_variables['CC_Alta'] is not None:
+            contrib = coef_variables['CC_Alta']
             valor_base += contrib
             contribuciones['calidad_alta'] = contrib
         
-        if datos.get('ascensor') and 'ascensor' in coef:
-            contrib = coef['ascensor']
+        if datos.get('ascensor') and 'DAS' in coef_variables and coef_variables['DAS'] is not None:
+            contrib = coef_variables['DAS']
             valor_base += contrib
             contribuciones['ascensor'] = contrib
         
-        if 'planta' in coef and datos.get('planta'):
-            contrib = coef['planta'] * datos['planta']
+        if 'PLbis' in coef_variables and coef_variables['PLbis'] is not None and datos.get('planta'):
+            contrib = coef_variables['PLbis'] * datos['planta']
             valor_base += contrib
             contribuciones['planta'] = contrib
         
@@ -110,73 +239,138 @@ class ModeloTasacion:
     
     def calcular_tasa_descuento(self, datos: Dict) -> Tuple[float, Dict]:
         """Calcula la tasa de descuento usando el modelo correspondiente"""
-        modelo = self.modelos.get('tasa_descuento', {})
-        coef = modelo.get('coeficientes', {})
-        contribuciones = {}
         
-        tasa_base = coef.get('intercepto', 0.05)
+        # Obtener el modelo de tasa desde los JSON cargados
+        modelo_tasa = self.modelos.get('testigos_tasa')
+        if not modelo_tasa:
+            st.error("❌ No se encontró el modelo de tasa en los archivos JSON")
+            return 0.05, {}
+        
+        # Usar los coeficientes reales del modelo JSON
+        coef_variables = modelo_tasa['coeficientes_variables']
+        _cons = modelo_tasa['_cons']
+        
+        contribuciones = {}
+        tasa_base = _cons
         contribuciones['tasa_base'] = tasa_base
         
-        # Aplicar coeficientes
-        if 'superficie' in coef and datos.get('superficie'):
-            contrib = coef['superficie'] * datos['superficie']
+        # Aplicar coeficientes según variables disponibles usando los coeficientes reales
+        if 'SU' in coef_variables and coef_variables['SU'] is not None and datos.get('superficie'):
+            contrib = coef_variables['SU'] * datos['superficie']
             tasa_base += contrib
             contribuciones['superficie'] = contrib
         
-        if 'antiguedad' in coef and datos.get('antiguedad'):
-            contrib = coef['antiguedad'] * datos['antiguedad']
+        # Para modelos de tasa/prima usar 'antig' (variable continua)
+        if 'antig' in coef_variables and coef_variables['antig'] is not None and datos.get('antiguedad'):
+            contrib = coef_variables['antig'] * datos['antiguedad']
             tasa_base += contrib
             contribuciones['antiguedad'] = contrib
         
-        if 'banos' in coef and datos.get('banos'):
-            contrib = coef['banos'] * datos['banos']
+        # Para modelos de valor usar 'Dnueva' (variable dicotómica)
+        if datos.get('vivienda_nueva') and 'Dnueva' in coef_variables and coef_variables['Dnueva'] is not None:
+            contrib = coef_variables['Dnueva']
+            tasa_base += contrib
+            contribuciones['vivienda_nueva'] = contrib
+        
+        if 'NB' in coef_variables and coef_variables['NB'] is not None and datos.get('banos'):
+            contrib = coef_variables['NB'] * datos['banos']
             tasa_base += contrib
             contribuciones['banos'] = contrib
         
-        if 'dormitorios' in coef and datos.get('dormitorios'):
-            contrib = coef['dormitorios'] * datos['dormitorios']
+        if 'ND' in coef_variables and coef_variables['ND'] is not None and datos.get('dormitorios'):
+            contrib = coef_variables['ND'] * datos['dormitorios']
             tasa_base += contrib
             contribuciones['dormitorios'] = contrib
         
-        if datos.get('calidad_alta') and 'calidad_alta' in coef:
-            contrib = coef['calidad_alta']
-            tasa_base += contrib
-            contribuciones['calidad_alta'] = contrib
-        
-        if datos.get('estado_alto') and 'estado_alto' in coef:
-            contrib = coef['estado_alto']
-            tasa_base += contrib
-            contribuciones['estado_alto'] = contrib
-        
-        if datos.get('ascensor') and 'ascensor' in coef:
-            contrib = coef['ascensor']
+        if datos.get('ascensor') and 'DAS' in coef_variables and coef_variables['DAS'] is not None:
+            contrib = coef_variables['DAS']
             tasa_base += contrib
             contribuciones['ascensor'] = contrib
         
-        if 'planta' in coef and datos.get('planta'):
-            contrib = coef['planta'] * datos['planta']
+        if datos.get('estado_alto') and 'EC_Alto' in coef_variables and coef_variables['EC_Alto'] is not None:
+            contrib = coef_variables['EC_Alto']
             tasa_base += contrib
-            contribuciones['planta'] = contrib
+            contribuciones['estado_alto'] = contrib
         
+        if datos.get('rehabilitacion') and 'rehab' in coef_variables and coef_variables['rehab'] is not None:
+            contrib = coef_variables['rehab']
+            tasa_base += contrib
+            contribuciones['rehabilitacion'] = contrib
+        
+        # Asegurar que la tasa esté en un rango razonable
         return max(0.01, min(0.15, tasa_base)), contribuciones
 
-def cargar_configuracion() -> Dict:
-    """Carga la configuración de modelos desde YAML"""
-    try:
-        with open('/app/config/models.yaml', 'r', encoding='utf-8') as file:
-            return yaml.safe_load(file)
-    except Exception as e:
-        st.error(f"Error cargando configuración: {e}")
-        return {}
+    def calcular_prima_riesgo(self, datos: Dict) -> Tuple[float, Dict]:
+        """Calcula la prima de riesgo usando el modelo correspondiente"""
+        
+        # Obtener el modelo de prima desde los JSON cargados
+        modelo_prima = self.modelos.get('testigos_prima')
+        if not modelo_prima:
+            st.error("❌ No se encontró el modelo de prima en los archivos JSON")
+            return 0.02, {}
+        
+        # Usar los coeficientes reales del modelo JSON
+        coef_variables = modelo_prima['coeficientes_variables']
+        _cons = modelo_prima['_cons']
+        
+        contribuciones = {}
+        prima_base = _cons
+        contribuciones['prima_base'] = prima_base
+        
+        # Aplicar coeficientes según variables disponibles usando los coeficientes reales
+        if 'SU' in coef_variables and coef_variables['SU'] is not None and datos.get('superficie'):
+            contrib = coef_variables['SU'] * datos['superficie']
+            prima_base += contrib
+            contribuciones['superficie'] = contrib
+        
+        if 'antig' in coef_variables and coef_variables['antig'] is not None and datos.get('antiguedad'):
+            contrib = coef_variables['antig'] * datos['antiguedad']
+            prima_base += contrib
+            contribuciones['antiguedad'] = contrib
+        
+        if datos.get('vivienda_nueva') and 'Dnueva' in coef_variables and coef_variables['Dnueva'] is not None:
+            contrib = coef_variables['Dnueva']
+            prima_base += contrib
+            contribuciones['vivienda_nueva'] = contrib
+        
+        if 'NB' in coef_variables and coef_variables['NB'] is not None and datos.get('banos'):
+            contrib = coef_variables['NB'] * datos['banos']
+            prima_base += contrib
+            contribuciones['banos'] = contrib
+        
+        if 'ND' in coef_variables and coef_variables['ND'] is not None and datos.get('dormitorios'):
+            contrib = coef_variables['ND'] * datos['dormitorios']
+            prima_base += contrib
+            contribuciones['dormitorios'] = contrib
+        
+        if datos.get('ascensor') and 'DAS' in coef_variables and coef_variables['DAS'] is not None:
+            contrib = coef_variables['DAS']
+            prima_base += contrib
+            contribuciones['ascensor'] = contrib
+        
+        if datos.get('estado_alto') and 'EC_Alto' in coef_variables and coef_variables['EC_Alto'] is not None:
+            contrib = coef_variables['EC_Alto']
+            prima_base += contrib
+            contribuciones['estado_alto'] = contrib
+        
+        if datos.get('rehabilitacion') and 'rehab' in coef_variables and coef_variables['rehab'] is not None:
+            contrib = coef_variables['rehab']
+            prima_base += contrib
+            contribuciones['rehabilitacion'] = contrib
+        
+        # Asegurar que la prima esté en un rango razonable
+        return max(0.005, min(0.10, prima_base)), contribuciones
 
 def inicializar_session_state():
     """Inicializa variables de session state"""
-    if 'config' not in st.session_state:
-        st.session_state.config = cargar_configuracion()
+    if 'modelos_json' not in st.session_state:
+        st.session_state.modelos_json = cargar_modelos_json()
     if 'modelo' not in st.session_state:
-        st.session_state.modelo = ModeloTasacion(st.session_state.config)
+        st.session_state.modelo = ModeloTasacion(st.session_state.modelos_json)
     if 'resultados_individuales' not in st.session_state:
         st.session_state.resultados_individuales = []
+    if 'config_sistema' not in st.session_state:
+        st.session_state.config_sistema = cargar_configuracion_sistema()
 
 def mostrar_header():
     """Header profesional con logos"""
@@ -212,11 +406,20 @@ def mostrar_header():
     st.markdown("---")
 
 def mostrar_sidebar():
-    """Sidebar con información del sistema"""
+    """Sidebar con información del sistema cargada desde YAML"""
+    if not st.session_state.config_sistema:
+        st.error("No se pudo cargar la configuración del sistema")
+        return
+        
+    config = st.session_state.config_sistema
+    sistema = config.get('sistema', {})
+    metricas = config.get('metricas', {})
+    modelos_config = config.get('modelos_disponibles', [])
+    
     with st.sidebar:
-        st.markdown("""
+        st.markdown(f"""
         <div style='background: linear-gradient(135deg, #1f77b4, #2e8bc0); padding: 2rem; border-radius: 10px; color: white; margin-bottom: 2rem;'>
-            <h3 style='color: white; margin-bottom: 1rem;'>📊 Sistema AESVAL ECO 805</h3>
+            <h3 style='color: white; margin-bottom: 1rem;'>📊 {sistema.get('nombre', 'Sistema AESVAL ECO 805')}</h3>
             <p style='margin-bottom: 0; font-size: 0.9rem;'>
                 Plataforma oficial para la tasación inteligente de inmuebles según normativa ECO 805
             </p>
@@ -224,57 +427,72 @@ def mostrar_sidebar():
         """, unsafe_allow_html=True)
         
         st.markdown("### ℹ️ Información del Sistema")
-        config = st.session_state.config
         st.info(f"""
-        **Versión:** {config.get('version', '2.0')}  
-        **Actualización:** {config.get('fecha_actualizacion', '2025-01-10')}  
-        **Modelo:** ECO 805 - Análisis Econométrico  
-        **Base de datos:** 205,000+ testigos
+        **Versión:** {sistema.get('version', '2.0')}
+        **Actualización:** {sistema.get('actualizacion', '2025-01-10')}
+        **Modelo:** {sistema.get('modelo', 'ECO 805 - Análisis Econométrico')}
+        **Base de datos:** {sistema.get('base_datos', '205,000+ testigos')}
         """)
         
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("R² Promedio", "82%")
+            st.metric("R² Promedio", metricas.get('r2_promedio', '82%'))
         with col2:
-            st.metric("Precisión", "97.2%")
+            st.metric("Precisión", metricas.get('precision', '97.2%'))
         
         st.markdown("---")
         st.markdown("### 📈 Modelos Disponibles")
-        st.write("• Municipios < 10,000 hab")
-        st.write("• Municipios 10,000-50,000 hab")  
-        st.write("• Municipios 50,000-200,000 hab")
-        st.write("• Municipios > 200,000 hab")
-        st.write("• Modelo Tasa Descuento")
+        
+        # Mostrar modelos desde la configuración YAML
+        for modelo in modelos_config:
+            nombre = modelo.get('nombre', modelo.get('clave', ''))
+            st.write(f"• {nombre}")
         
         st.markdown("---")
         st.markdown(f"""
         <div style='text-align: center; color: #666; font-size: 0.8rem; padding: 1rem 0;'>
-            <p>© {current_year} AESVAL - CTIC</p>
+            <p>© {sistema.get('año', current_year)} {sistema.get('desarrollador', 'AESVAL - CTIC')}</p>
             <p>Sistema de Tasación Inteligente</p>
         </div>
         """, unsafe_allow_html=True)
 
-def obtener_poblacion_municipio(municipio: str) -> int:
-    """Obtiene población aproximada del municipio (datos de ejemplo)"""
-    poblaciones = {
-        "Gijón": 268000,
-        "Oviedo": 215000,
-        "Avilés": 76000,
-        "Mieres": 38000,
-        "Langreo": 39000,
-        "Siero": 52000,
-        "Castrillón": 22000,
-        "Corvera": 16000,
-        "Carreño": 10500,
-        "Gozón": 10500,
-        "Villaviciosa": 14500,
-        "Sariego": 1300,
-        "Bimenes": 1700,
-        "Nava": 5200,
-        "Cabranes": 800,
-        "Piloña": 7200
+def obtener_codigos_disponibles():
+    """Obtiene todos los códigos de municipio disponibles en los modelos"""
+    modelos = st.session_state.modelos_json
+    codigos = set()
+    
+    for modelo in modelos.values():
+        if 'coeficientes_municipios' in modelo:
+            codigos.update(modelo['coeficientes_municipios'].keys())
+    
+    return sorted(list(codigos))
+
+def obtener_poblacion_por_codigo(codigo_municipio: str) -> int:
+    """Obtiene población aproximada basada en el código del municipio"""
+    # Mapeo simplificado de códigos a poblaciones (ejemplo)
+    poblaciones_por_codigo = {
+        # Códigos para municipios grandes (>200,000 hab)
+        "33021": 268000,  # Gijón
+        "33044": 215000,  # Oviedo
+        "33004": 76000,   # Avilés
+        # Códigos para municipios medianos (50,000-200,000)
+        "33036": 38000,   # Mieres
+        "33032": 39000,   # Langreo
+        "33066": 52000,   # Siero
+        # Códigos para municipios pequeños (<50,000)
+        "33016": 22000,   # Castrillón
+        "33020": 16000,   # Corvera
+        "33015": 10500,   # Carreño
+        "33025": 10500,   # Gozón
+        "33076": 14500,   # Villaviciosa
+        "33063": 1300,    # Sariego
+        "33006": 1700,    # Bimenes
+        "33042": 5200,    # Nava
+        "33008": 800,     # Cabranes
+        "33049": 7200     # Piloña
     }
-    return poblaciones.get(municipio, 50000)
+    
+    return poblaciones_por_codigo.get(codigo_municipio, 50000)
 
 def pagina_tasacion_individual():
     """Pestaña para tasación individual con modelos reales"""
@@ -295,13 +513,40 @@ def pagina_tasacion_individual():
             col1_1, col1_2 = st.columns(2)
             
             with col1_1:
-                municipio = st.selectbox(
-                    "Municipio",
-                    ["Gijón", "Oviedo", "Avilés", "Mieres", "Langreo", "Siero", "Castrillón", 
-                     "Corvera", "Carreño", "Gozón", "Villaviciosa", "Sariego", "Bimenes", "Nava", "Cabranes", "Piloña"],
-                    help="Seleccione el municipio donde se ubica el inmueble"
+                # Selección directa del modelo
+                modelos_disponibles = st.session_state.modelo.obtener_modelos_disponibles()
+                if not modelos_disponibles:
+                    st.error("❌ No se cargaron modelos. Verifique los archivos JSON en config/")
+                    st.stop()
+                
+                # CORRECCIÓN: Usar la lista de tuplas correctamente
+                modelo_seleccionado = st.selectbox(
+                    "Seleccione el modelo",
+                    options=[clave for clave, nombre in modelos_disponibles],
+                    format_func=lambda x: next((nombre for clave, nombre in modelos_disponibles if clave == x), x),
+                    help="Elija el modelo econométrico según el tamaño del municipio"
                 )
                 
+                # Determinar tipo de modelo
+                es_tasa_prima = es_modelo_tasa_o_prima(modelo_seleccionado)
+                es_modelo_prima = modelo_seleccionado == 'testigos_prima'
+                es_modelo_tasa = modelo_seleccionado == 'testigos_tasa'
+                
+                # Código del municipio (siempre visible)
+                modelo_obj = st.session_state.modelo.obtener_modelo(modelo_seleccionado)
+                codigos_disponibles = list(modelo_obj['coeficientes_municipios'].keys()) if modelo_obj and 'coeficientes_municipios' in modelo_obj else []
+                
+                if not codigos_disponibles:
+                    st.error("❌ El modelo seleccionado no tiene códigos de municipio disponibles")
+                    st.stop()
+                
+                codigo_municipio = st.selectbox(
+                    "Código de Municipio",
+                    options=codigos_disponibles,
+                    help="Seleccione el código del municipio"
+                )
+                
+                # SUPERFICIE - siempre visible pero con diferente comportamiento
                 superficie = st.number_input(
                     "Superficie construida (m²)", 
                     min_value=20.0, 
@@ -311,165 +556,337 @@ def pagina_tasacion_individual():
                     help="Superficie total construida en metros cuadrados"
                 )
                 
-                antiguedad = st.number_input(
-                    "Antigüedad (años)", 
-                    min_value=0, 
-                    max_value=200,
-                    value=15,
-                    help="Años desde la construcción del inmueble"
-                )
+                # INICIALIZAR AMBAS VARIABLES FUERA DE LOS BLOQUES CONDICIONALES
+                estado_conservacion = "Buena"  # Valor por defecto
+                estado_conservacion_valor = "Buena"  # Valor por defecto
                 
+                # Campos para modelos de VALOR (ocultos para Tasa/Prima)
+                if not es_tasa_prima:
+                    # Dnueva: Vivienda nueva (<5 años)
+                    vivienda_nueva = st.checkbox(
+                        "Vivienda nueva (<5 años)", 
+                        value=False, 
+                        help="Menos de 5 años de antigüedad (variable Dnueva)"
+                    )
+                    
+                    # DCA: Calefacción
+                    calefaccion = st.checkbox(
+                        "Calefacción", 
+                        value=True, 
+                        help="¿Tiene sistema de calefacción? (variable DCA)"
+                    )
+                
+                # Campos para modelos de TASA/PRIMA (ocultos para Valor)
+                if es_tasa_prima:
+                    # antig: Antigüedad (variable continua para tasa/prima)
+                    antiguedad = st.number_input(
+                        "Antigüedad (años)", 
+                        min_value=0, 
+                        max_value=200,
+                        value=15,
+                        help="Años desde la construcción del inmueble (variable antig)"
+                    )
+                    
+                    # rehab: Rehabilitación
+                    rehabilitacion = st.checkbox(
+                        "Rehabilitación del edificio", 
+                        value=False, 
+                        help="¿El edificio ha sido rehabilitado? (variable rehab)"
+                    )
+                    
+                    # EC_Alto: Estado de conservación alto
+                    estado_conservacion = st.select_slider(
+                        "Estado de conservación",
+                        options=["Muy deficiente", "Deficiente", "Regular", "Buena", "Muy buena", "Óptima"],
+                        value="Buena",
+                        help="Estado general de conservación del inmueble (variable EC_Alto)"
+                    )
+            
+            with col1_2:
+                # CAMPOS COMUNES A TODOS LOS MODELOS
+                
+                # ND: Número de dormitorios
                 dormitorios = st.number_input(
                     "Número de dormitorios",
                     min_value=1,
                     max_value=10,
                     value=3,
-                    help="Número total de dormitorios"
+                    help="Número total de dormitorios (variable ND)"
                 )
-            
-            with col1_2:
+                
+                # NB: Número de baños
                 banos = st.number_input(
                     "Número de baños",
                     min_value=1,
                     max_value=6,
                     value=2,
-                    help="Número total de baños"
+                    help="Número total de baños (variable NB)"
                 )
                 
+                # PLbis: Planta
                 planta = st.number_input(
                     "Planta",
                     min_value=0,
                     max_value=20,
                     value=2,
-                    help="Planta en la que se ubica el inmueble"
+                    help="Planta en la que se ubica el inmueble (variable PLbis)"
                 )
                 
-                calefaccion = st.checkbox("Calefacción", value=True, help="¿Tiene sistema de calefacción?")
-                ascensor = st.checkbox("Ascensor", value=True, help="¿El edificio tiene ascensor?")
-                vivienda_nueva = st.checkbox("Vivienda nueva (<5 años)", value=False, help="Menos de 5 años de antigüedad")
-                calidad_alta = st.checkbox("Calidad constructiva alta", value=False, help="Calidad de materiales y acabados alta")
-                
-                estado_conservacion = st.select_slider(
-                    "Estado de conservación",
-                    options=["Muy deficiente", "Deficiente", "Regular", "Bueno", "Muy bueno", "Excelente"],
-                    value="Bueno",
-                    help="Estado general de conservación del inmueble"
+                # DAS: Ascensor
+                ascensor = st.checkbox(
+                    "Ascensor", 
+                    value=True, 
+                    help="¿El edificio tiene ascensor? (variable DAS)"
                 )
+                
+                # CC_Alta: Calidad constructiva alta
+                calidad_alta = st.checkbox(
+                    "Calidad constructiva alta", 
+                    value=False, 
+                    help="Calidad de materiales y acabados alta (variable CC_Alta)"
+                )
+                
+                # Campos específicos para modelos de VALOR
+                if not es_tasa_prima:
+                    # Estado de conservación para modelos de valor
+                    estado_conservacion_valor = st.select_slider(
+                        "Estado de conservación",
+                        options=["Muy deficiente", "Deficiente", "Regular", "Buena", "Muy buena", "Óptima"],
+                        value="Buena",
+                        help="Estado general de conservación del inmueble"
+                    )
     
     with col2:
         with st.container():
             st.subheader("🎯 Calcular Tasación")
             
-            if st.button("📈 Calcular Valor y Tasa", type="primary", width=True):
+            # Mostrar información del modelo seleccionado
+            if es_tasa_prima:
+                if es_modelo_prima:
+                    st.info("🛡️ **Modelo de Prima de Riesgo activado**")
+                    st.write("Variables: SU, antig, NB, ND, CC_Alta, EC_Alto, rehab, DAS, PLbis")
+                else:
+                    st.info("📈 **Modelo de Tasa Descuento activado**")
+                    st.write("Variables: SU, antig, NB, ND, CC_Alta, EC_Alto, rehab, DAS, PLbis")
+            else:
+                st.info("💰 **Modelo de Valor activado**")
+                st.write("Variables: Dnueva, SU, DCA, ND, NB, CC_Alta, DAS, PLbis")
+            
+            if st.button("📈 Calcular Valor y Tasa", type="primary", use_container_width=True):
                 with st.spinner("Calculando tasación usando modelos econométricos..."):
-                    # Obtener datos para el modelo
-                    poblacion = obtener_poblacion_municipio(municipio)
-                    modelo_valor = st.session_state.modelo.obtener_modelo_por_poblacion(poblacion)
+                    # Obtener el modelo seleccionado directamente
+                    modelo_valor = st.session_state.modelo.obtener_modelo(modelo_seleccionado)
                     
                     if not modelo_valor:
-                        st.error("❌ No se encontró modelo para el municipio seleccionado")
+                        st.error("❌ No se pudo cargar el modelo seleccionado")
                         return
                     
-                    # Preparar datos
-                    datos_inmueble = {
-                        'superficie': superficie,
-                        'antiguedad': antiguedad,
-                        'dormitorios': dormitorios,
-                        'banos': banos,
-                        'planta': planta,
-                        'calefaccion': calefaccion,
-                        'ascensor': ascensor,
-                        'vivienda_nueva': vivienda_nueva,
-                        'calidad_alta': calidad_alta,
-                        'estado_alto': estado_conservacion in ["Muy bueno", "Excelente"]
-                    }
+                    # Preparar datos según el tipo de modelo
+                    if es_tasa_prima:
+                        datos_inmueble = {
+                            'superficie': superficie,
+                            'antiguedad': antiguedad,  # Variable continua para tasa/prima
+                            'dormitorios': dormitorios,
+                            'banos': banos,
+                            'planta': planta,
+                            'ascensor': ascensor,
+                            'rehabilitacion': rehabilitacion,  # Solo para tasa/prima
+                            'calidad_alta': calidad_alta,
+                            # CONDICIÓN ACTUALIZADA: "Alta", "Buena", "Muy buena", "Óptima" = True
+                            'estado_alto': estado_conservacion in ["Alta", "Buena", "Muy buena", "Óptima"]
+                        }
+                    else:
+                        datos_inmueble = {
+                            'superficie': superficie,
+                            'dormitorios': dormitorios,
+                            'banos': banos,
+                            'planta': planta,
+                            'calefaccion': calefaccion,  # DCA - solo para valor
+                            'ascensor': ascensor,
+                            'vivienda_nueva': vivienda_nueva,  # Dnueva - solo para valor
+                            'calidad_alta': calidad_alta,
+                            # CONDICIÓN ACTUALIZADA: "Alta", "Buena", "Muy buena", "Óptima" = True
+                            'estado_alto': estado_conservacion_valor in ["Alta", "Buena", "Muy buena", "Óptima"]
+                        }
                     
-                    # Calcular valor por m²
-                    valor_m2, contrib_valor = st.session_state.modelo.calcular_valor_m2(datos_inmueble, modelo_valor)
-                    valor_total = valor_m2 * superficie
+                    # Calcular valor por m² (solo para modelos de valor)
+                    if not es_tasa_prima:
+                        valor_m2, contrib_valor = st.session_state.modelo.calcular_valor_m2(
+                            datos_inmueble, modelo_valor, codigo_municipio
+                        )
+                        valor_total = valor_m2 * superficie
+                    else:
+                        valor_m2 = 0
+                        valor_total = 0
+                        contrib_valor = {}
                     
-                    # Calcular tasa de descuento
+                    # Calcular tasa de descuento y prima de riesgo
                     tasa_descuento, contrib_tasa = st.session_state.modelo.calcular_tasa_descuento(datos_inmueble)
-                    
+                    prima_riesgo, contrib_prima = st.session_state.modelo.calcular_prima_riesgo(datos_inmueble)
+
                     # Mostrar resultados
                     st.success("✅ Tasación calculada correctamente")
                     
-                    # Métricas principales
-                    col_res1, col_res2, col_res3 = st.columns(3)
-                    with col_res1:
-                        st.metric("Valor por m²", f"€ {valor_m2:,.0f}")
-                    with col_res2:
-                        st.metric("Valor Total", f"€ {valor_total:,.0f}")
-                    with col_res3:
-                        st.metric("Tasa Descuento", f"{tasa_descuento:.2%}")
+                    # Métricas principales (adaptadas al tipo de modelo)
+                    if es_modelo_prima:
+                        # Mostrar resultados para modelo de PRIMA
+                        col_res1, col_res2, col_res3 = st.columns(3)
+                        with col_res1:
+                            st.metric("Prima de Riesgo", f"{prima_riesgo:.2%}")
+                        with col_res2:
+                            st.metric("Tasa Descuento", f"{tasa_descuento:.2%}")
+                        with col_res3:
+                            st.metric("Tipo de Modelo", "Prima Riesgo")
                     
+                    elif es_modelo_tasa:
+                        # Mostrar resultados para modelo de TASA
+                        col_res1, col_res2, col_res3 = st.columns(3)
+                        with col_res1:
+                            st.metric("Tasa Descuento", f"{tasa_descuento:.2%}")
+                        with col_res2:
+                            st.metric("Prima de Riesgo", f"{prima_riesgo:.2%}")
+                        with col_res3:
+                            st.metric("Tipo de Modelo", "Tasa Descuento")
+                    
+                    else:
+                        # Mostrar resultados para modelos de VALOR
+                        col_res1, col_res2, col_res3 = st.columns(3)
+                        with col_res1:
+                            st.metric("Valor por m²", f"€ {valor_m2:,.0f}")
+                        with col_res2:
+                            st.metric("Valor Total", f"€ {valor_total:,.0f}")
+                        with col_res3:
+                            st.metric("Tasa Descuento", f"{tasa_descuento:.2%}")
+
                     # Información del modelo usado
-                    st.info(f"**Modelo aplicado:** {modelo_valor['nombre']} (R² = {modelo_valor['r2']})")
+                    st.info(f"**Modelo aplicado:** {modelo_valor['nombre_modelo']}")
                     
                     # Contribuciones detalladas
                     with st.expander("📊 Análisis Detallado de Contribuciones", expanded=True):
-                        col_contrib1, col_contrib2 = st.columns(2)
+                        if es_modelo_prima:
+                            # Para modelo de PRIMA: mostrar contribuciones de prima y tasa
+                            col_contrib1, col_contrib2 = st.columns(2)
+                            
+                            with col_contrib1:
+                                st.subheader("🛡️ Contribución a la Prima")
+                                contrib_df_prima = pd.DataFrame({
+                                    'Variable': list(contrib_prima.keys()),
+                                    'Contribución (%)': [f"{v:.4f}" for v in contrib_prima.values()]
+                                })
+                                st.dataframe(contrib_df_prima, width=True)
+                            
+                            with col_contrib2:
+                                st.subheader("📈 Contribución a la Tasa")
+                                contrib_df_tasa = pd.DataFrame({
+                                    'Variable': list(contrib_tasa.keys()),
+                                    'Contribución (%)': [f"{v:.4f}" for v in contrib_tasa.values()]
+                                })
+                                st.dataframe(contrib_df_tasa, width=True)
                         
-                        with col_contrib1:
-                            st.subheader("💰 Contribución al Valor por m²")
-                            contrib_df_valor = pd.DataFrame({
-                                'Variable': list(contrib_valor.keys()),
-                                'Contribución (€)': list(contrib_valor.values())
-                            })
-                            st.dataframe(contrib_df_valor, width=True)
-                        
-                        with col_contrib2:
+                        elif es_modelo_tasa:
+                            # Para modelo de TASA: mostrar contribuciones de tasa
                             st.subheader("📈 Contribución a la Tasa")
                             contrib_df_tasa = pd.DataFrame({
                                 'Variable': list(contrib_tasa.keys()),
                                 'Contribución (%)': [f"{v:.4f}" for v in contrib_tasa.values()]
                             })
                             st.dataframe(contrib_df_tasa, width=True)
+                        
+                        else:
+                            # Para modelos de VALOR: mostrar contribuciones de valor y tasa
+                            col_contrib1, col_contrib2 = st.columns(2)
+                            
+                            with col_contrib1:
+                                st.subheader("💰 Contribución al Valor por m²")
+                                contrib_df_valor = pd.DataFrame({
+                                    'Variable': list(contrib_valor.keys()),
+                                    'Contribución (€)': list(contrib_valor.values())
+                                })
+                                st.dataframe(contrib_df_valor, width=True)
+                            
+                            with col_contrib2:
+                                st.subheader("📈 Contribución a la Tasa")
+                                contrib_df_tasa = pd.DataFrame({
+                                    'Variable': list(contrib_tasa.keys()),
+                                    'Contribución (%)': [f"{v:.4f}" for v in contrib_tasa.values()]
+                                })
+                                st.dataframe(contrib_df_tasa, width=True)
                     
                     # Factores más influyentes
                     with st.expander("🎯 Factores Más Influyentes", expanded=True):
-                        # Para valor
-                        contrib_abs_valor = {k: abs(v) for k, v in contrib_valor.items() if k != 'valor_base'}
-                        top3_valor = sorted(contrib_abs_valor.items(), key=lambda x: x[1], reverse=True)[:3]
+                        if es_modelo_prima:
+                            # Para prima
+                            contrib_abs_prima = {k: abs(float(v)) for k, v in contrib_prima.items() if k != 'prima_base'}
+                            top3_prima = sorted(contrib_abs_prima.items(), key=lambda x: x[1], reverse=True)[:3]
+                            
+                            # Para tasa
+                            contrib_abs_tasa = {k: abs(float(v)) for k, v in contrib_tasa.items() if k != 'tasa_base'}
+                            top3_tasa = sorted(contrib_abs_tasa.items(), key=lambda x: x[1], reverse=True)[:3]
+                            
+                            col_top1, col_top2 = st.columns(2)
+                            with col_top1:
+                                st.write("**Prima de riesgo:**")
+                                for i, (var, val) in enumerate(top3_prima, 1):
+                                    st.write(f"{i}. {var}: {contrib_prima[var]:.4f}")
+                            
+                            with col_top2:
+                                st.write("**Tasa de descuento:**")
+                                for i, (var, val) in enumerate(top3_tasa, 1):
+                                    st.write(f"{i}. {var}: {contrib_tasa[var]:.4f}")
                         
-                        # Para tasa
-                        contrib_abs_tasa = {k: abs(float(v)) for k, v in contrib_tasa.items() if k != 'tasa_base'}
-                        top3_tasa = sorted(contrib_abs_tasa.items(), key=lambda x: x[1], reverse=True)[:3]
-                        
-                        col_top1, col_top2 = st.columns(2)
-                        with col_top1:
-                            st.write("**Valor por m²:**")
-                            for i, (var, val) in enumerate(top3_valor, 1):
-                                st.write(f"{i}. {var}: € {contrib_valor[var]:.0f}")
-                        
-                        with col_top2:
+                        elif es_modelo_tasa:
+                            # Solo para tasa
+                            contrib_abs_tasa = {k: abs(float(v)) for k, v in contrib_tasa.items() if k != 'tasa_base'}
+                            top3_tasa = sorted(contrib_abs_tasa.items(), key=lambda x: x[1], reverse=True)[:3]
+                            
                             st.write("**Tasa de descuento:**")
                             for i, (var, val) in enumerate(top3_tasa, 1):
                                 st.write(f"{i}. {var}: {contrib_tasa[var]:.4f}")
+                        
+                        else:
+                            # Para valor y tasa
+                            contrib_abs_valor = {k: abs(v) for k, v in contrib_valor.items() if k != 'valor_base'}
+                            top3_valor = sorted(contrib_abs_valor.items(), key=lambda x: x[1], reverse=True)[:3]
+                            
+                            contrib_abs_tasa = {k: abs(float(v)) for k, v in contrib_tasa.items() if k != 'tasa_base'}
+                            top3_tasa = sorted(contrib_abs_tasa.items(), key=lambda x: x[1], reverse=True)[:3]
+                            
+                            col_top1, col_top2 = st.columns(2)
+                            with col_top1:
+                                st.write("**Valor por m²:**")
+                                for i, (var, val) in enumerate(top3_valor, 1):
+                                    st.write(f"{i}. {var}: € {contrib_valor[var]:.0f}")
+                            
+                            with col_top2:
+                                st.write("**Tasa de descuento:**")
+                                for i, (var, val) in enumerate(top3_tasa, 1):
+                                    st.write(f"{i}. {var}: {contrib_tasa[var]:.4f}")
                     
                     # Botón de descarga
                     resultado = {
                         'fecha_calculo': datetime.now().isoformat(),
-                        'municipio': municipio,
+                        'codigo_municipio': codigo_municipio,
                         'superficie': superficie,
                         'valor_m2': valor_m2,
                         'valor_total': valor_total,
                         'tasa_descuento': tasa_descuento,
-                        'modelo_usado': modelo_valor['nombre'],
+                        'prima_riesgo': prima_riesgo,
+                        'modelo_usado': modelo_valor['nombre_modelo'],
                         'contribuciones_valor': contrib_valor,
-                        'contribuciones_tasa': contrib_tasa
+                        'contribuciones_tasa': contrib_tasa,
+                        'contribuciones_prima': contrib_prima
                     }
-                    
+
                     st.download_button(
                         "📥 Descargar Informe JSON",
                         data=json.dumps(resultado, indent=2),
-                        file_name=f"tasacion_{municipio}_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                        file_name=f"tasacion_{codigo_municipio}_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
                         mime="application/json",
-                        width=True
+                        use_container_width=True
                     )
             else:
                 st.info("ℹ️ Complete los datos y haga clic en 'Calcular Valor y Tasa' para obtener resultados")
-
+                
 def pagina_tasacion_multiple():
     """Pestaña para tasación múltiple con validación avanzada"""
     st.header("📁 Tasación Múltiple por Lotes")
@@ -484,7 +901,8 @@ def pagina_tasacion_multiple():
         - Límite: 500 registros por lote
         
         **Columnas requeridas en el Excel:**
-        - `municipio`: Nombre del municipio
+        - `modelo`: Nombre del modelo (testigos_menos_10000, testigos_10000_50000, etc.)
+        - `codigo_municipio`: Código del municipio (ej: 2005, 2006, etc.)
         - `superficie`: Superficie en m² (número)
         - `antiguedad`: Años desde construcción (número)
         - `dormitorios`: Número de dormitorios (número)
@@ -510,7 +928,7 @@ def pagina_tasacion_multiple():
                 df = pd.read_excel(uploaded_file)
                 
                 # Validar columnas requeridas
-                columnas_requeridas = ['municipio', 'superficie', 'antiguedad', 'dormitorios', 'banos', 'planta']
+                columnas_requeridas = ['codigo_municipio', 'superficie', 'antiguedad', 'dormitorios', 'banos', 'planta']
                 columnas_opcionales = ['calefaccion', 'ascensor', 'vivienda_nueva', 'calidad_alta']
                 
                 faltan_requeridas = [col for col in columnas_requeridas if col not in df.columns]
@@ -518,14 +936,14 @@ def pagina_tasacion_multiple():
                     st.error(f"❌ Faltan columnas requeridas: {', '.join(faltan_requeridas)}")
                     return
                 
-                st.success(f"✅ Archivo cargado correctamente - {len(df)} registros detectados")
+                print(f"✅ Archivo cargado correctamente - {len(df)} registros detectados")
                 
                 # Estadísticas
                 col_stats1, col_stats2, col_stats3 = st.columns(3)
                 with col_stats1:
                     st.metric("Registros", len(df))
                 with col_stats2:
-                    st.metric("Municipios", df['municipio'].nunique())
+                    st.metric("Municipios", df['codigo_municipio'].nunique())
                 with col_stats3:
                     st.metric("Tasaciones estimadas", f"{len(df)*3}s")
                 
@@ -542,16 +960,18 @@ def pagina_tasacion_multiple():
                         for idx, fila in df.iterrows():
                             try:
                                 # Validar datos de la fila
-                                if pd.isna(fila['municipio']) or pd.isna(fila['superficie']):
+                                if pd.isna(fila['codigo_municipio']) or pd.isna(fila['superficie']):
                                     errores.append(f"Fila {idx+2}: Datos requeridos faltantes")
                                     continue
                                 
-                                # Obtener población y modelo
-                                poblacion = obtener_poblacion_municipio(str(fila['municipio']))
-                                modelo_valor = st.session_state.modelo.obtener_modelo_por_poblacion(poblacion)
+                                codigo_municipio = str(fila['codigo_municipio'])
+                                
+                                # Obtener modelo directamente
+                                modelo_nombre = str(fila['modelo'])
+                                modelo_valor = st.session_state.modelo.obtener_modelo(modelo_nombre)
                                 
                                 if not modelo_valor:
-                                    errores.append(f"Fila {idx+2}: No hay modelo para {fila['municipio']}")
+                                    errores.append(f"Fila {idx+2}: Modelo {modelo_nombre} no encontrado")
                                     continue
                                 
                                 # Preparar datos
@@ -569,7 +989,9 @@ def pagina_tasacion_multiple():
                                 }
                                 
                                 # Calcular valores
-                                valor_m2, contrib_valor = st.session_state.modelo.calcular_valor_m2(datos, modelo_valor)
+                                valor_m2, contrib_valor = st.session_state.modelo.calcular_valor_m2(
+                                    datos, modelo_valor, codigo_municipio
+                                )
                                 valor_total = valor_m2 * datos['superficie']
                                 tasa_descuento, contrib_tasa = st.session_state.modelo.calcular_tasa_descuento(datos)
                                 
@@ -579,12 +1001,12 @@ def pagina_tasacion_multiple():
                                 factores_influyentes = ", ".join([f[0] for f in top_factores])
                                 
                                 resultados.append({
-                                    'municipio': fila['municipio'],
+                                    'codigo_municipio': codigo_municipio,
                                     'superficie': datos['superficie'],
                                     'valor_m2': round(valor_m2, 2),
                                     'valor_total': round(valor_total, 2),
                                     'tasa_descuento': round(tasa_descuento, 4),
-                                    'modelo': modelo_valor['nombre'],
+                                    'modelo': modelo_valor['nombre_modelo'],
                                     'factores_influyentes': factores_influyentes
                                 })
                                 
@@ -634,17 +1056,18 @@ def pagina_tasacion_multiple():
     with col2:
         st.subheader("📋 Plantilla de Ejemplo")
         
-        # Crear plantilla con datos de ejemplo
+        # Crear plantilla con datos de ejemplo usando códigos
         sample_data = {
-            'municipio': ['Gijón', 'Oviedo', 'Avilés', 'Sariego', 'Nava'],
+            'modelo': ['testigos_menos_10000', 'testigos_menos_10000', 'testigos_menos_10000', 'testigos_menos_10000', 'testigos_menos_10000'],
+            'codigo_municipio': ['2005', '2006', '2007', '2008', '2010'],
             'superficie': [85.5, 120.0, 65.0, 95.0, 110.0],
-            'antiguedad': [15, 8, 25, 5, 12],
             'dormitorios': [3, 4, 2, 3, 4],
             'banos': [2, 3, 1, 2, 2],
             'planta': [2, 3, 1, 0, 2],
             'calefaccion': [True, True, False, True, True],
             'ascensor': [True, True, False, False, True],
             'vivienda_nueva': [False, True, False, True, False],
+            'rehabilitacion': [False, False, True, False, True],
             'calidad_alta': [False, True, False, False, True]
         }
         sample_df = pd.DataFrame(sample_data)
@@ -654,67 +1077,59 @@ def pagina_tasacion_multiple():
             data=sample_df.to_csv(index=False),
             file_name="plantilla_tasacion_multiple.csv",
             mime="text/csv",
-            help="Descargue esta plantilla como referencia para el formato requerido",
-            width=True
+            help="Descargue esta plantilla como referencia para el formato requerido"
         )
-        
+
         st.markdown("---")
         st.markdown("### 💡 Consejos")
-        st.write("• Use nombres de municipios consistentes")
+        st.write("• Use códigos de municipio válidos")
         st.write("• Verifique que los valores numéricos sean positivos")
         st.write("• Las columnas booleanas pueden usar Sí/No o 1/0")
         st.write("• El procesamiento tarda ~3 segundos por registro")
 
 def pagina_documentacion():
-    """Pestaña de documentación técnica mejorada"""
+    """Pestaña de documentación técnica mejorada usando configuración YAML"""
+    if not st.session_state.config_sistema:
+        st.error("No se pudo cargar la configuración del sistema")
+        return
+        
+    config = st.session_state.config_sistema
+    doc_config = config.get('documentacion', {})
+    modelos_config = config.get('modelos_disponibles', [])
+    
     st.header("📚 Documentación Técnica - Modelos ECO 805")
     
-    # Introducción
-    st.markdown("""
+    # Introducción desde YAML
+    introduccion = doc_config.get('introduccion', 'Sistema de valoración basado en análisis de regresión múltiple.')
+    st.markdown(f"""
     <div style='background: #f0f2f6; padding: 2rem; border-radius: 10px; border-left: 4px solid #1f77b4;'>
         <h4 style='color: #1f77b4; margin-top: 0;'>Modelos Econométricos para Tasación Inmobiliaria</h4>
-        <p style='margin-bottom: 0;'>
-            Sistema de valoración basado en análisis de regresión múltiple sobre una base de datos de 
-            <strong>205,000+ observaciones</strong> (testigos y viviendas tasadas). Desarrollado según 
-            la normativa ECO 805 con validación estadística robusta.
-        </p>
+        <p style='margin-bottom: 0;'>{introduccion}</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Metodología
+    # Metodología desde YAML
     st.subheader("🔬 Metodología Científica")
     
     col_metodo1, col_metodo2 = st.columns(2)
     
     with col_metodo1:
-        st.markdown("""
-        **Base de Datos:**
-        - **205,000+ testigos** inmobiliarios
-        - **34,000+ viviendas** tasadas por AESVAL
-        - Período de análisis: **2000-2024**
-        - Variables intrínsecas y extrínsecas
+        st.markdown("**Base de Datos:**")
+        for item in doc_config.get('metodologia', {}).get('base_datos', []):
+            st.write(f"- {item}")
         
-        **Procesamiento:**
-        - Limpieza y validación de datos
-        - Análisis de regresión múltiple
-        - Segmentación por tamaño municipal
-        - Validación de robustez estadística
-        """)
+        st.markdown("**Procesamiento:**")
+        for item in doc_config.get('metodologia', {}).get('procesamiento', []):
+            st.write(f"- {item}")
     
     with col_metodo2:
-        st.markdown("""
-        **Validación Estadística:**
-        - Coeficientes de determinación R²: 0.78-0.88
-        - Errores estándar robustos
-        - Tests de significancia estadística
-        - Análisis de residuos
-        - Validación cruzada
+        st.markdown("**Validación Estadística:**")
+        for item in doc_config.get('metodologia', {}).get('validacion', []):
+            st.write(f"- {item}")
         
-        **Software Utilizado:**
-        - STATA 18 para análisis econométrico
-        - Python para implementación
-        - Streamlit para interfaz web
-        """)
+        st.markdown("**Software Utilizado:**")
+        for item in doc_config.get('metodologia', {}).get('software', []):
+            st.write(f"- {item}")
     
     # Modelos matemáticos
     st.subheader("🧮 Modelos Matemáticos Implementados")
@@ -741,21 +1156,6 @@ def pagina_documentacion():
         - Número de dormitorios (negativo en municipios grandes)
         - Calefacción, ascensor, calidad constructiva
         """)
-        
-        # Mostrar coeficientes de ejemplo
-        st.markdown("#### Coeficientes Ejemplares (Municipios >200,000 hab)")
-        coef_ejemplo = {
-            'Intercepto': 1410.69,
-            'Vivienda Nueva': 161.31,
-            'Superficie (m²)': 7.44,
-            'Calefacción': 140.03,
-            'Dormitorios': -379.05,
-            'Baños': 290.35,
-            'Calidad Alta': 418.63,
-            'Ascensor': 584.55,
-            'Planta': 30.40
-        }
-        st.dataframe(pd.DataFrame(list(coef_ejemplo.items()), columns=['Variable', 'Coeficiente (€)']))
     
     with tab_model2:
         st.markdown("""
@@ -819,78 +1219,14 @@ def pagina_documentacion():
     - **Ascensor**: Impacto creciente con tamaño municipal
     - **Planta**: Mayor valoración en municipios grandes
     """)
-    
-    # Variables analizadas
-    st.subheader("📊 Variables Analizadas en el Estudio")
-    
-    tab_vars1, tab_vars2, tab_vars3 = st.tabs(["Intrínsecas", "Extrínsecas", "Resultados"])
-    
-    with tab_vars1:
-        st.markdown("""
-        ### Variables Intrínsecas del Inmueble
-        
-        **Características Físicas:**
-        - Superficie construida (m²)
-        - Año de construcción → Antigüedad
-        - Número de dormitorios
-        - Número de baños
-        - Planta de ubicación
-        
-        **Calidades y Dotaciones:**
-        - Calidad constructiva (Básica/Media/Alta/Lujo)
-        - Estado de conservación (1-6)
-        - Calefacción (Sí/No)
-        - Ascensor (Sí/No)
-        - Aire acondicionado
-        - Trastero, plaza garaje
-        """)
-    
-    with tab_vars2:
-        st.markdown("""
-        ### Variables Extrínsecas y de Entorno
-        
-        **Ubicación:**
-        - Municipio y código postal
-        - Comunidad Autónoma
-        - Tamaño de población
-        - Tipología de núcleo (urbano/rural)
-        
-        **Entorno Económico:**
-        - Euribor histórico
-        - Crecimiento del PIB
-        - Tasa de paro municipal
-        - IPC y evolución de precios
-        
-        **Servicios y Equipamientos:**
-        - Accesibilidad y comunicaciones
-        - Equipamiento educativo
-        - Zonas verdes y recreativas
-        - Comercio y servicios
-        """)
-    
-    with tab_vars3:
-        st.markdown("""
-        ### Resultados y Validaciones
-        
-        **Robustez Estadística:**
-        - Todos los coeficientes significativos (p < 0.05)
-        - R² consistentes por segmentos
-        - Residuos normalmente distribuidos
-        - No multicolinealidad crítica
-        
-        **Validación Cruzada:**
-        - Comparación testigos vs viviendas tasadas
-        - Análisis por períodos temporales
-        - Validación con datos externos (INE)
-        
-        **Aplicabilidad:**
-        - Cobertura nacional completa
-        - Actualización periódica automática
-        - Escalable a nuevas tipologías
-        """)
 
 def mostrar_footer():
-    """Footer profesional"""
+    """Footer usando configuración YAML"""
+    if not st.session_state.config_sistema:
+        sistema_info = {'nombre': 'AESVAL - CTIC', 'version': 'v2.0'}
+    else:
+        sistema_info = st.session_state.config_sistema.get('sistema', {})
+    
     st.markdown("---")
     
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -900,8 +1236,8 @@ def mostrar_footer():
             f"""
             <div style='text-align: center; color: #666; padding: 2rem 0;'>
                 <p style='margin-bottom: 0.5rem; font-size: 0.9rem;'>
-                    © {current_year} <strong>AESVAL</strong> - Centro Tecnológico CTIC | 
-                    Sistema de Tasación Inteligente ECO 805 v2.0
+                    © {sistema_info.get('año', current_year)} <strong>{sistema_info.get('desarrollador', 'AESVAL - CTIC')}</strong> | 
+                    {sistema_info.get('nombre', 'Sistema de Tasación Inteligente')} {sistema_info.get('version', 'v2.0')}
                 </p>
                 <p style='margin-bottom: 0; font-size: 0.8rem;'>
                     Desarrollado con Streamlit • Modelos Econométricos STATA • 
