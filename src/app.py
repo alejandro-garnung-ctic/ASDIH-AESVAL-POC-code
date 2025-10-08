@@ -452,7 +452,7 @@ def mostrar_sidebar():
         st.markdown(f"""
         <div style='text-align: center; color: #666; font-size: 0.8rem; padding: 1rem 0;'>
             <p>© {sistema.get('año', current_year)} {sistema.get('desarrollador', 'AESVAL - CTIC')}</p>
-            <p>Sistema de Tasación Inteligente</p>
+            <p>Sistema de Tasación Automático</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -773,15 +773,15 @@ def pagina_tasacion_individual():
                                     'Variable': list(contrib_prima.keys()),
                                     'Contribución (%)': [f"{v:.4f}" for v in contrib_prima.values()]
                                 })
-                                st.dataframe(contrib_df_prima, width=True)
-                            
+                                st.dataframe(contrib_df_prima, use_container_width=True, height=200)
+                                                            
                             with col_contrib2:
                                 st.subheader("📈 Contribución a la Tasa")
                                 contrib_df_tasa = pd.DataFrame({
                                     'Variable': list(contrib_tasa.keys()),
                                     'Contribución (%)': [f"{v:.4f}" for v in contrib_tasa.values()]
                                 })
-                                st.dataframe(contrib_df_tasa, width=True)
+                                st.dataframe(contrib_df_tasa, use_container_width=True, height=200)
                         
                         elif es_modelo_tasa:
                             # Para modelo de TASA: mostrar contribuciones de tasa
@@ -790,7 +790,7 @@ def pagina_tasacion_individual():
                                 'Variable': list(contrib_tasa.keys()),
                                 'Contribución (%)': [f"{v:.4f}" for v in contrib_tasa.values()]
                             })
-                            st.dataframe(contrib_df_tasa, width=True)
+                            st.dataframe(contrib_df_tasa, use_container_width=True, height=200)
                         
                         else:
                             # Para modelos de VALOR: mostrar contribuciones de valor y tasa
@@ -802,7 +802,8 @@ def pagina_tasacion_individual():
                                     'Variable': list(contrib_valor.keys()),
                                     'Contribución (€)': list(contrib_valor.values())
                                 })
-                                st.dataframe(contrib_df_valor, width=True)
+                                st.dataframe(contrib_df_valor, use_container_width=True, height=200)
+
                             
                             with col_contrib2:
                                 st.subheader("📈 Contribución a la Tasa")
@@ -810,7 +811,7 @@ def pagina_tasacion_individual():
                                     'Variable': list(contrib_tasa.keys()),
                                     'Contribución (%)': [f"{v:.4f}" for v in contrib_tasa.values()]
                                 })
-                                st.dataframe(contrib_df_tasa, width=True)
+                                st.dataframe(contrib_df_tasa, use_container_width=True, height=200)
                     
                     # Factores más influyentes
                     with st.expander("🎯 Factores Más Influyentes", expanded=True):
@@ -1237,7 +1238,7 @@ def mostrar_footer():
             <div style='text-align: center; color: #666; padding: 2rem 0;'>
                 <p style='margin-bottom: 0.5rem; font-size: 0.9rem;'>
                     © {sistema_info.get('año', current_year)} <strong>{sistema_info.get('desarrollador', 'AESVAL - CTIC')}</strong> | 
-                    {sistema_info.get('nombre', 'Sistema de Tasación Inteligente')} {sistema_info.get('version', 'v2.0')}
+                    {sistema_info.get('nombre', 'Sistema de Tasación Automático')} {sistema_info.get('version', 'v2.0')}
                 </p>
                 <p style='margin-bottom: 0; font-size: 0.8rem;'>
                     Desarrollado con Streamlit • Modelos Econométricos STATA • 
