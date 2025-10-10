@@ -188,6 +188,7 @@ class ModeloTasacion:
         _cons = modelo['_cons']
         
         contribuciones = {}
+        contribuciones_porcentaje = {}
         
         # Valor base (constante + efecto municipio)
         valor_base = _cons + coef_municipio
@@ -235,7 +236,14 @@ class ModeloTasacion:
             valor_base += contrib
             contribuciones['planta'] = contrib
         
-        return max(0, valor_base), contribuciones
+        valor_final = max(0, valor_base)
+        
+        # CALCULAR PORCENTAJES RELATIVOS
+        if valor_final > 0:
+            for key, value in contribuciones.items():
+                contribuciones_porcentaje[key] = (value / valor_final) * 100 # En porcentaje
+        
+        return valor_final, contribuciones_porcentaje # ← Devuelve porcentajes
     
     def calcular_tasa_descuento(self, datos: Dict) -> Tuple[float, Dict]:
         """Calcula la tasa de descuento usando el modelo correspondiente"""
@@ -251,6 +259,7 @@ class ModeloTasacion:
         _cons = modelo_tasa['_cons']
         
         contribuciones = {}
+        contribuciones_porcentaje = {}
         tasa_base = _cons
         contribuciones['tasa_base'] = tasa_base
         
@@ -260,13 +269,11 @@ class ModeloTasacion:
             tasa_base += contrib
             contribuciones['superficie'] = contrib
         
-        # Para modelos de tasa/prima usar 'antig' (variable continua)
         if 'antig' in coef_variables and coef_variables['antig'] is not None and datos.get('antiguedad'):
             contrib = coef_variables['antig'] * datos['antiguedad']
             tasa_base += contrib
             contribuciones['antiguedad'] = contrib
         
-        # Para modelos de valor usar 'Dnueva' (variable dicotómica)
         if datos.get('vivienda_nueva') and 'Dnueva' in coef_variables and coef_variables['Dnueva'] is not None:
             contrib = coef_variables['Dnueva']
             tasa_base += contrib
@@ -298,7 +305,14 @@ class ModeloTasacion:
             contribuciones['rehabilitacion'] = contrib
         
         # Asegurar que la tasa esté en un rango razonable
-        return max(0.01, min(0.15, tasa_base)), contribuciones
+        tasa_final = max(0.01, min(1.0, tasa_base))
+        
+        # CALCULAR PORCENTAJES RELATIVOS
+        contribuciones_porcentaje = {}
+        for key, value in contribuciones.items():
+            contribuciones_porcentaje[key] = (value / tasa_final) * 100  
+        
+        return tasa_final, contribuciones_porcentaje
 
     def calcular_prima_riesgo(self, datos: Dict) -> Tuple[float, Dict]:
         """Calcula la prima de riesgo usando el modelo correspondiente"""
@@ -314,6 +328,7 @@ class ModeloTasacion:
         _cons = modelo_prima['_cons']
         
         contribuciones = {}
+        contribuciones_porcentaje = {}
         prima_base = _cons
         contribuciones['prima_base'] = prima_base
         
@@ -359,8 +374,15 @@ class ModeloTasacion:
             contribuciones['rehabilitacion'] = contrib
         
         # Asegurar que la prima esté en un rango razonable
-        return max(0.005, min(0.10, prima_base)), contribuciones
-    
+        prima_final = max(0.01, min(1.0, prima_base))
+        
+        # CALCULAR PORCENTAJES RELATIVOS
+        contribuciones_porcentaje = {}
+        for key, value in contribuciones.items():
+            contribuciones_porcentaje[key] = (value / prima_final) * 100 
+        
+        return prima_final, contribuciones_porcentaje
+
 def inicializar_session_state():
     """Inicializa variables de session state"""
     if 'modelos_json' not in st.session_state:
@@ -774,25 +796,28 @@ def pagina_tasacion_individual():
                             st.subheader("🛡️ Contribución a la Prima")
                             contrib_df_prima = pd.DataFrame({
                                 'Variable': list(resultados['contrib_prima'].keys()),
-                                'Contribución (%)': [f"{v:.4f}" for v in resultados['contrib_prima'].values()]
+                                'Impacto en Prima': [f"{v:+.1f}%" for v in resultados['contrib_prima'].values()],  
+                                'Efecto': ['📈 Aumenta' if v > 0 else '📉 Reduce' for v in resultados['contrib_prima'].values()]
                             })
-                            st.dataframe(contrib_df_prima, use_container_width=True, height=200)
+                            st.dataframe(contrib_df_prima, use_container_width=True, height=200, hide_index=True)
                         
                         elif es_modelo_tasa:
                             st.subheader("📈 Contribución a la Tasa")
                             contrib_df_tasa = pd.DataFrame({
                                 'Variable': list(resultados['contrib_tasa'].keys()),
-                                'Contribución (%)': [f"{v:.4f}" for v in resultados['contrib_tasa'].values()]
+                                'Impacto en Tasa': [f"{v:+.1f}%" for v in resultados['contrib_tasa'].values()],
+                                'Efecto': ['📈 Aumenta' if v > 0 else '📉 Reduce' for v in resultados['contrib_tasa'].values()]
                             })
-                            st.dataframe(contrib_df_tasa, use_container_width=True, height=200)
+                            st.dataframe(contrib_df_tasa, use_container_width=True, height=200, hide_index=True)
                         
                         else:
                             st.subheader("💰 Contribución al Valor por m²")
                             contrib_df_valor = pd.DataFrame({
                                 'Variable': list(resultados['contrib_valor'].keys()),
-                                'Contribución (€)': list(resultados['contrib_valor'].values())
+                                'Impacto en Valor': [f"{v:+.1f}%" for v in resultados['contrib_valor'].values()],
+                                'Efecto': ['📈 Aumenta' if v > 0 else '📉 Reduce' for v in resultados['contrib_valor'].values()]
                             })
-                            st.dataframe(contrib_df_valor, use_container_width=True, height=200)
+                            st.dataframe(contrib_df_valor, use_container_width=True, height=200, hide_index=True)
                     
                     # Preparar resultado para descarga
                     resultado_descarga = {
