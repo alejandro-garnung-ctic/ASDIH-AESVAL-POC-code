@@ -23,6 +23,16 @@ Documentación: Consulte la explicación del modelo matemático
 - **Análisis de Contribuciones**: Identificación de variables más influyentes
 - **Validación de Datos**: Verificación de formatos y completitud
 
+### Variable Contribution Calculation
+
+Each variable contributes to the final result by multiplying its **value** by its **coefficient** from the econometric model. For example:
+
+- **Surface area**: `80 m² × -4.145 €/m² = -331.6 €` (negative effect in small municipalities)
+- **Additional bathroom**: `1 bathroom × 90.862 € = +90.86 €` (positive effect)  
+- **Elevator**: `Yes × 116.861 € = +116.86 €` (positive effect)
+
+Coefficients come from regression analysis on 205,000+ observations and represent the marginal impact of each characteristic on value/rate.
+
 ## Instalación y Ejecución
 
 ### Con Docker Compose (Recomendado)
@@ -33,7 +43,8 @@ docker compose up --build
 
 La aplicación estará disponible en: `http://localhost:8501`
 
-Configuración
+### Configuración
+
 Los modelos y coeficientes se configuran en config/modelos.yaml.
 
 
@@ -115,4 +126,4 @@ sudo netstat -tulpn | grep 8501
 - DUDA: El usuario solo debería escoger entre los modelos de testigos en función de la población? Es decir, podría escoger también el modelo de prima o el de tasa? O estos dos último SIEMPRE se deberían calcular junto con el escogido de los testigos por población?
 - La "Información del Sistema" también debería ir por config en un yaml y cargarla dinámicamente en vez de hardoceada. Así como los datos de R^2 promedio, precisión, modelos disponibles, etc....
 - Que al cambiar de modelo se mantengan los valores que hubieran metidos en las casillas del modelo anterior (que coincidan entre ellos).
-- Limitación actual: ¿Cómo vamos a calcular la tasa de descuento para un CODIGOINTEGRADO que no está en el modelo? => Ahora mismo NO PODEMOS; ellos tendrían que buscar una solución adecuada (e.g. diferenciar modelos segmentados por nº habitantes también).
+- Limitación actual: ¿Cómo vamos a calcular la tasa de descuento para un CODIGOINTEGRADO que no está en el modelo? => Ahora mismo NO PODEMOS; ellos tendrían que buscar una solución adecuada (e.g. diferenciar modelos  de segmentar por nº habitantes también).

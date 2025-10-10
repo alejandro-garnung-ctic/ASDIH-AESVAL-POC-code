@@ -360,7 +360,7 @@ class ModeloTasacion:
         
         # Asegurar que la prima esté en un rango razonable
         return max(0.005, min(0.10, prima_base)), contribuciones
-
+    
 def inicializar_session_state():
     """Inicializa variables de session state"""
     if 'modelos_json' not in st.session_state:
@@ -371,6 +371,22 @@ def inicializar_session_state():
         st.session_state.resultados_individuales = []
     if 'config_sistema' not in st.session_state:
         st.session_state.config_sistema = cargar_configuracion_sistema()
+    
+    # NUEVO: Inicializar variables para persistencia de datos entre modelos
+    if 'datos_persistentes' not in st.session_state:
+        st.session_state.datos_persistentes = {
+            'superficie': 80.0,
+            'dormitorios': 3,
+            'banos': 2,
+            'planta': 2,
+            'ascensor': True,
+            'calidad_alta': False,
+            'vivienda_nueva': False,
+            'calefaccion': True,
+            'antiguedad': 15,
+            'rehabilitacion': False,
+            'estado_conservacion': "Buena"
+        }
 
 def mostrar_header():
     """Header profesional con logos"""
@@ -481,10 +497,9 @@ def pagina_tasacion_individual():
                     st.error("❌ No se cargaron modelos. Verifique los archivos JSON en config/")
                     st.stop()
                 
-                # CORRECCIÓN: Usar la lista de tuplas correctamente
                 modelo_seleccionado = st.selectbox(
                     "Seleccione el modelo",
-                    options=[clave for clave, nombre in modelos_disponibles],
+                    options=[clave for clave, _ in modelos_disponibles],
                     format_func=lambda x: next((nombre for clave, nombre in modelos_disponibles if clave == x), x),
                     help="Elija el modelo econométrico según el tamaño del municipio"
                 )
@@ -493,6 +508,7 @@ def pagina_tasacion_individual():
                 es_tasa_prima = es_modelo_tasa_o_prima(modelo_seleccionado)
                 es_modelo_prima = modelo_seleccionado == 'testigos_prima'
                 es_modelo_tasa = modelo_seleccionado == 'testigos_tasa'
+                es_modelo_valor = not es_tasa_prima
                 
                 # Código del municipio (siempre visible)
                 modelo_obj = st.session_state.modelo.obtener_modelo(modelo_seleccionado)
@@ -505,136 +521,158 @@ def pagina_tasacion_individual():
                 codigo_municipio = st.selectbox(
                     "Código de Municipio",
                     options=codigos_disponibles,
-                    help="Seleccione el código del municipio"
+                    help="Seleccione el código del municipio",
+                    key="codigo_municipio"
                 )
                 
-                # SUPERFICIE - siempre visible pero con diferente comportamiento
+                # CAMPOS COMUNES A TODOS LOS MODELOS (siempre visibles)
                 superficie = st.number_input(
                     "Superficie construida (m²)", 
                     min_value=20.0, 
                     max_value=1000.0,
-                    value=80.0,
+                    value=st.session_state.datos_persistentes['superficie'],
                     step=0.5,
-                    help="Superficie total construida en metros cuadrados"
+                    help="Superficie total construida en metros cuadrados",
+                    key="superficie"
                 )
                 
-                # INICIALIZAR AMBAS VARIABLES FUERA DE LOS BLOQUES CONDICIONALES
-                estado_conservacion = "Buena"  # Valor por defecto
-                estado_conservacion_valor = "Buena"  # Valor por defecto
-                
-                # Campos para modelos de VALOR (ocultos para Tasa/Prima)
-                if not es_tasa_prima:
-                    # Dnueva: Vivienda nueva (<5 años)
-                    vivienda_nueva = st.checkbox(
-                        "Vivienda nueva (<5 años)", 
-                        value=False, 
-                        help="Menos de 5 años de antigüedad (variable Dnueva)"
-                    )
-                    
-                    # DCA: Calefacción
-                    calefaccion = st.checkbox(
-                        "Calefacción", 
-                        value=True, 
-                        help="¿Tiene sistema de calefacción? (variable DCA)"
-                    )
-                
-                # Campos para modelos de TASA/PRIMA (ocultos para Valor)
-                if es_tasa_prima:
-                    # antig: Antigüedad (variable continua para tasa/prima)
-                    antiguedad = st.number_input(
-                        "Antigüedad (años)", 
-                        min_value=0, 
-                        max_value=200,
-                        value=15,
-                        help="Años desde la construcción del inmueble (variable antig)"
-                    )
-                    
-                    # rehab: Rehabilitación
-                    rehabilitacion = st.checkbox(
-                        "Rehabilitación del edificio", 
-                        value=False, 
-                        help="¿El edificio ha sido rehabilitado? (variable rehab)"
-                    )
-                    
-                    # EC_Alto: Estado de conservación alto
-                    estado_conservacion = st.select_slider(
-                        "Estado de conservación",
-                        options=["Muy deficiente", "Deficiente", "Regular", "Buena", "Muy buena", "Óptima"],
-                        value="Buena",
-                        help="Estado general de conservación del inmueble (variable EC_Alto)"
-                    )
-            
-            with col1_2:
-                # CAMPOS COMUNES A TODOS LOS MODELOS
-                
-                # ND: Número de dormitorios
                 dormitorios = st.number_input(
                     "Número de dormitorios",
                     min_value=1,
                     max_value=10,
-                    value=3,
-                    help="Número total de dormitorios (variable ND)"
+                    value=st.session_state.datos_persistentes['dormitorios'],
+                    help="Número total de dormitorios (variable ND)",
+                    key="dormitorios"
                 )
                 
-                # NB: Número de baños
                 banos = st.number_input(
                     "Número de baños",
                     min_value=1,
                     max_value=6,
-                    value=2,
-                    help="Número total de baños (variable NB)"
+                    value=st.session_state.datos_persistentes['banos'],
+                    help="Número total de baños (variable NB)",
+                    key="banos"
                 )
                 
-                # PLbis: Planta
+                # CAMPOS ESPECÍFICOS SEGÚN TIPO DE MODELO
+                if es_modelo_valor:
+                    # CAMPOS PARA MODELOS DE VALOR
+                    vivienda_nueva = st.checkbox(
+                        "Vivienda nueva (<5 años)", 
+                        value=st.session_state.datos_persistentes['vivienda_nueva'],
+                        help="Menos de 5 años de antigüedad (variable Dnueva)",
+                        key="vivienda_nueva"
+                    )
+                    
+                    calefaccion = st.checkbox(
+                        "Calefacción", 
+                        value=st.session_state.datos_persistentes['calefaccion'],
+                        help="¿Tiene sistema de calefacción? (variable DCA)",
+                        key="calefaccion"
+                    )
+                    
+                    estado_conservacion_valor = st.select_slider(
+                        "Estado de conservación",
+                        options=["Muy deficiente", "Deficiente", "Regular", "Buena", "Muy buena", "Óptima"],
+                        value=st.session_state.datos_persistentes['estado_conservacion'],
+                        help="Estado general de conservación del inmueble",
+                        key="estado_conservacion_valor"
+                    )
+                
+                else:
+                    # CAMPOS PARA MODELOS DE TASA/PRIMA
+                    antiguedad = st.number_input(
+                        "Antigüedad (años)", 
+                        min_value=0, 
+                        max_value=200,
+                        value=st.session_state.datos_persistentes['antiguedad'],
+                        help="Años desde la construcción del inmueble (variable antig)",
+                        key="antiguedad"
+                    )
+                    
+                    rehabilitacion = st.checkbox(
+                        "Rehabilitación del edificio", 
+                        value=st.session_state.datos_persistentes['rehabilitacion'],
+                        help="¿El edificio ha sido rehabilitado? (variable rehab)",
+                        key="rehabilitacion"
+                    )
+                    
+                    estado_conservacion = st.select_slider(
+                        "Estado de conservación",
+                        options=["Muy deficiente", "Deficiente", "Regular", "Buena", "Muy buena", "Óptima"],
+                        value=st.session_state.datos_persistentes['estado_conservacion'],
+                        help="Estado general de conservación del inmueble (variable EC_Alto)",
+                        key="estado_conservacion_tasa"
+                    )
+            
+            with col1_2:
+                # CAMPOS COMUNES (continuación)
                 planta = st.number_input(
                     "Planta",
                     min_value=0,
                     max_value=20,
-                    value=2,
-                    help="Planta en la que se ubica el inmueble (variable PLbis)"
+                    value=st.session_state.datos_persistentes['planta'],
+                    help="Planta en la que se ubica el inmueble (variable PLbis)",
+                    key="planta"
                 )
                 
-                # DAS: Ascensor
                 ascensor = st.checkbox(
                     "Ascensor", 
-                    value=True, 
-                    help="¿El edificio tiene ascensor? (variable DAS)"
+                    value=st.session_state.datos_persistentes['ascensor'],
+                    help="¿El edificio tiene ascensor? (variable DAS)",
+                    key="ascensor"
                 )
                 
-                # CC_Alta: Calidad constructiva alta
                 calidad_alta = st.checkbox(
                     "Calidad constructiva alta", 
-                    value=False, 
-                    help="Calidad de materiales y acabados alta (variable CC_Alta)"
+                    value=st.session_state.datos_persistentes['calidad_alta'],
+                    help="Calidad de materiales y acabados alta (variable CC_Alta)",
+                    key="calidad_alta"
                 )
                 
-                # Campos específicos para modelos de VALOR
-                if not es_tasa_prima:
-                    # Estado de conservación para modelos de valor
-                    estado_conservacion_valor = st.select_slider(
-                        "Estado de conservación",
-                        options=["Muy deficiente", "Deficiente", "Regular", "Buena", "Muy buena", "Óptima"],
-                        value="Buena",
-                        help="Estado general de conservación del inmueble"
-                    )
+                # Botón para actualizar datos persistentes
+                if st.button("💾 Guardar valores actuales", use_container_width=True):
+                    # Actualizar datos persistentes con los valores actuales
+                    st.session_state.datos_persistentes.update({
+                        'superficie': superficie,
+                        'dormitorios': dormitorios,
+                        'banos': banos,
+                        'planta': planta,
+                        'ascensor': ascensor,
+                        'calidad_alta': calidad_alta,
+                        'vivienda_nueva': vivienda_nueva if es_modelo_valor else st.session_state.datos_persistentes['vivienda_nueva'],
+                        'calefaccion': calefaccion if es_modelo_valor else st.session_state.datos_persistentes['calefaccion'],
+                        'antiguedad': antiguedad if not es_modelo_valor else st.session_state.datos_persistentes['antiguedad'],
+                        'rehabilitacion': rehabilitacion if not es_modelo_valor else st.session_state.datos_persistentes['rehabilitacion'],
+                        'estado_conservacion': estado_conservacion_valor if es_modelo_valor else estado_conservacion
+                    })
+                    st.success("✅ Valores guardados para uso entre modelos")
     
     with col2:
         with st.container():
             st.subheader("🎯 Calcular Tasación")
             
             # Mostrar información del modelo seleccionado
-            if es_tasa_prima:
-                if es_modelo_prima:
-                    st.info("🛡️ **Modelo de Prima de Riesgo activado**")
-                    st.write("Variables: SU, antig, NB, ND, CC_Alta, EC_Alto, rehab, DAS, PLbis")
-                else:
-                    st.info("📈 **Modelo de Tasa Descuento activado**")
-                    st.write("Variables: SU, antig, NB, ND, CC_Alta, EC_Alto, rehab, DAS, PLbis")
+            if es_modelo_prima:
+                st.info("🛡️ **Modelo de Prima de Riesgo activado**")
+                st.write("Calcula únicamente la prima de riesgo")
+            elif es_modelo_tasa:
+                st.info("📈 **Modelo de Tasa Descuento activado**")
+                st.write("Calcula únicamente la tasa de descuento")
             else:
                 st.info("💰 **Modelo de Valor activado**")
-                st.write("Variables: Dnueva, SU, DCA, ND, NB, CC_Alta, DAS, PLbis")
+                st.write("Calcula únicamente el valor por m²")
             
-            if st.button("📈 Calcular Valor y Tasa", type="primary", use_container_width=True):
+            # Texto del botón según el tipo de modelo
+            texto_boton = ""
+            if es_modelo_prima:
+                texto_boton = "🛡️ Calcular Prima de Riesgo"
+            elif es_modelo_tasa:
+                texto_boton = "📈 Calcular Tasa Descuento"
+            else:
+                texto_boton = "💰 Calcular Valor"
+            
+            if st.button(texto_boton, type="primary", use_container_width=True):
                 with st.spinner("Calculando tasación usando modelos econométricos..."):
                     # Obtener el modelo seleccionado directamente
                     modelo_valor = st.session_state.modelo.obtener_modelo(modelo_seleccionado)
@@ -647,14 +685,14 @@ def pagina_tasacion_individual():
                     if es_tasa_prima:
                         datos_inmueble = {
                             'superficie': superficie,
-                            'antiguedad': antiguedad, # Variable continua para tasa/prima
+                            'antiguedad': antiguedad,
                             'dormitorios': dormitorios,
                             'banos': banos,
                             'planta': planta,
                             'ascensor': ascensor,
-                            'rehabilitacion': rehabilitacion, # Solo para tasa/prima
+                            'rehabilitacion': rehabilitacion,
                             'calidad_alta': calidad_alta,
-                            'estado_alto': estado_conservacion in ["Alta", "Buena", "Muy buena", "Óptima"]
+                            'estado_alto': estado_conservacion in ["Buena", "Muy buena", "Óptima"]
                         }
                     else:
                         datos_inmueble = {
@@ -662,191 +700,135 @@ def pagina_tasacion_individual():
                             'dormitorios': dormitorios,
                             'banos': banos,
                             'planta': planta,
-                            'calefaccion': calefaccion, # DCA - solo para valor
+                            'calefaccion': calefaccion,
                             'ascensor': ascensor,
-                            'vivienda_nueva': vivienda_nueva, # Dnueva - solo para valor
+                            'vivienda_nueva': vivienda_nueva,
                             'calidad_alta': calidad_alta,
-                            'estado_alto': estado_conservacion_valor in ["Alta", "Buena", "Muy buena", "Óptima"]
+                            'estado_alto': estado_conservacion_valor in ["Buena", "Muy buena", "Óptima"]
                         }
                     
-                    # Calcular valor por m² (solo para modelos de valor)
-                    if not es_tasa_prima:
+                    # CALCULAR SÓLO LO QUE CORRESPONDA AL MODELO SELECCIONADO
+                    resultados = {}
+                    
+                    if es_modelo_valor:
+                        # Solo calcular valor para modelos de valor
                         valor_m2, contrib_valor = st.session_state.modelo.calcular_valor_m2(
                             datos_inmueble, modelo_valor, codigo_municipio
                         )
                         valor_total = valor_m2 * superficie
-                    else:
-                        valor_m2 = 0
-                        valor_total = 0
-                        contrib_valor = {}
+                        resultados.update({
+                            'valor_m2': valor_m2,
+                            'valor_total': valor_total,
+                            'contrib_valor': contrib_valor
+                        })
                     
-                    # Calcular tasa de descuento y prima de riesgo
-                    tasa_descuento, contrib_tasa = st.session_state.modelo.calcular_tasa_descuento(datos_inmueble)
-                    prima_riesgo, contrib_prima = st.session_state.modelo.calcular_prima_riesgo(datos_inmueble)
-
+                    elif es_modelo_tasa:
+                        # Solo calcular tasa para modelo de tasa
+                        tasa_descuento, contrib_tasa = st.session_state.modelo.calcular_tasa_descuento(datos_inmueble)
+                        resultados.update({
+                            'tasa_descuento': tasa_descuento,
+                            'contrib_tasa': contrib_tasa
+                        })
+                    
+                    elif es_modelo_prima:
+                        # Solo calcular prima para modelo de prima
+                        prima_riesgo, contrib_prima = st.session_state.modelo.calcular_prima_riesgo(datos_inmueble)
+                        resultados.update({
+                            'prima_riesgo': prima_riesgo,
+                            'contrib_prima': contrib_prima
+                        })
+                    
                     # Mostrar resultados
                     st.success("✅ Tasación calculada correctamente")
                     
-                    # Métricas principales (adaptadas al tipo de modelo)
+                    # Métricas principales (solo lo que se calculó)
                     if es_modelo_prima:
-                        # Mostrar resultados para modelo de PRIMA
-                        col_res1, col_res2, col_res3 = st.columns(3)
+                        col_res1, col_res2 = st.columns(2)
                         with col_res1:
-                            st.metric("Prima de Riesgo", f"{prima_riesgo:.2%}")
+                            st.metric("Prima de Riesgo", f"{resultados['prima_riesgo']:.2%}")
                         with col_res2:
-                            st.metric("Tasa Descuento", f"{tasa_descuento:.2%}")
-                        with col_res3:
                             st.metric("Tipo de Modelo", "Prima Riesgo")
                     
                     elif es_modelo_tasa:
-                        # Mostrar resultados para modelo de TASA
-                        col_res1, col_res2, col_res3 = st.columns(3)
+                        col_res1, col_res2 = st.columns(2)
                         with col_res1:
-                            st.metric("Tasa Descuento", f"{tasa_descuento:.2%}")
+                            st.metric("Tasa Descuento", f"{resultados['tasa_descuento']:.2%}")
                         with col_res2:
-                            st.metric("Prima de Riesgo", f"{prima_riesgo:.2%}")
-                        with col_res3:
                             st.metric("Tipo de Modelo", "Tasa Descuento")
                     
                     else:
-                        # Mostrar resultados para modelos de VALOR
                         col_res1, col_res2, col_res3 = st.columns(3)
                         with col_res1:
-                            st.metric("Valor por m²", f"€ {valor_m2:,.0f}")
+                            st.metric("Valor por m²", f"€ {resultados['valor_m2']:,.0f}")
                         with col_res2:
-                            st.metric("Valor Total", f"€ {valor_total:,.0f}")
+                            st.metric("Valor Total", f"€ {resultados['valor_total']:,.0f}")
                         with col_res3:
-                            st.metric("Tasa Descuento", f"{tasa_descuento:.2%}")
-
+                            st.metric("Tipo de Modelo", "Valor")
+                    
                     # Información del modelo usado
                     st.info(f"**Modelo aplicado:** {modelo_valor['nombre_modelo']}")
                     
-                    # Contribuciones detalladas
+                    # Contribuciones detalladas (solo las relevantes)
                     with st.expander("📊 Análisis Detallado de Contribuciones", expanded=True):
                         if es_modelo_prima:
-                            # Para modelo de PRIMA: mostrar contribuciones de prima y tasa
-                            col_contrib1, col_contrib2 = st.columns(2)
-                            
-                            with col_contrib1:
-                                st.subheader("🛡️ Contribución a la Prima")
-                                contrib_df_prima = pd.DataFrame({
-                                    'Variable': list(contrib_prima.keys()),
-                                    'Contribución (%)': [f"{v:.4f}" for v in contrib_prima.values()]
-                                })
-                                st.dataframe(contrib_df_prima, use_container_width=True, height=200)
-                                                            
-                            with col_contrib2:
-                                st.subheader("📈 Contribución a la Tasa")
-                                contrib_df_tasa = pd.DataFrame({
-                                    'Variable': list(contrib_tasa.keys()),
-                                    'Contribución (%)': [f"{v:.4f}" for v in contrib_tasa.values()]
-                                })
-                                st.dataframe(contrib_df_tasa, use_container_width=True, height=200)
+                            st.subheader("🛡️ Contribución a la Prima")
+                            contrib_df_prima = pd.DataFrame({
+                                'Variable': list(resultados['contrib_prima'].keys()),
+                                'Contribución (%)': [f"{v:.4f}" for v in resultados['contrib_prima'].values()]
+                            })
+                            st.dataframe(contrib_df_prima, use_container_width=True, height=200)
                         
                         elif es_modelo_tasa:
-                            # Para modelo de TASA: mostrar contribuciones de tasa
                             st.subheader("📈 Contribución a la Tasa")
                             contrib_df_tasa = pd.DataFrame({
-                                'Variable': list(contrib_tasa.keys()),
-                                'Contribución (%)': [f"{v:.4f}" for v in contrib_tasa.values()]
+                                'Variable': list(resultados['contrib_tasa'].keys()),
+                                'Contribución (%)': [f"{v:.4f}" for v in resultados['contrib_tasa'].values()]
                             })
                             st.dataframe(contrib_df_tasa, use_container_width=True, height=200)
                         
                         else:
-                            # Para modelos de VALOR: mostrar contribuciones de valor y tasa
-                            col_contrib1, col_contrib2 = st.columns(2)
-                            
-                            with col_contrib1:
-                                st.subheader("💰 Contribución al Valor por m²")
-                                contrib_df_valor = pd.DataFrame({
-                                    'Variable': list(contrib_valor.keys()),
-                                    'Contribución (€)': list(contrib_valor.values())
-                                })
-                                st.dataframe(contrib_df_valor, use_container_width=True, height=200)
-
-                            
-                            with col_contrib2:
-                                st.subheader("📈 Contribución a la Tasa")
-                                contrib_df_tasa = pd.DataFrame({
-                                    'Variable': list(contrib_tasa.keys()),
-                                    'Contribución (%)': [f"{v:.4f}" for v in contrib_tasa.values()]
-                                })
-                                st.dataframe(contrib_df_tasa, use_container_width=True, height=200)
+                            st.subheader("💰 Contribución al Valor por m²")
+                            contrib_df_valor = pd.DataFrame({
+                                'Variable': list(resultados['contrib_valor'].keys()),
+                                'Contribución (€)': list(resultados['contrib_valor'].values())
+                            })
+                            st.dataframe(contrib_df_valor, use_container_width=True, height=200)
                     
-                    # Factores más influyentes
-                    with st.expander("🎯 Factores Más Influyentes", expanded=True):
-                        if es_modelo_prima:
-                            # Para prima
-                            contrib_abs_prima = {k: abs(float(v)) for k, v in contrib_prima.items() if k != 'prima_base'}
-                            top3_prima = sorted(contrib_abs_prima.items(), key=lambda x: x[1], reverse=True)[:3]
-                            
-                            # Para tasa
-                            contrib_abs_tasa = {k: abs(float(v)) for k, v in contrib_tasa.items() if k != 'tasa_base'}
-                            top3_tasa = sorted(contrib_abs_tasa.items(), key=lambda x: x[1], reverse=True)[:3]
-                            
-                            col_top1, col_top2 = st.columns(2)
-                            with col_top1:
-                                st.write("**Prima de riesgo:**")
-                                for i, (var, val) in enumerate(top3_prima, 1):
-                                    st.write(f"{i}. {var}: {contrib_prima[var]:.4f}")
-                            
-                            with col_top2:
-                                st.write("**Tasa de descuento:**")
-                                for i, (var, val) in enumerate(top3_tasa, 1):
-                                    st.write(f"{i}. {var}: {contrib_tasa[var]:.4f}")
-                        
-                        elif es_modelo_tasa:
-                            # Solo para tasa
-                            contrib_abs_tasa = {k: abs(float(v)) for k, v in contrib_tasa.items() if k != 'tasa_base'}
-                            top3_tasa = sorted(contrib_abs_tasa.items(), key=lambda x: x[1], reverse=True)[:3]
-                            
-                            st.write("**Tasa de descuento:**")
-                            for i, (var, val) in enumerate(top3_tasa, 1):
-                                st.write(f"{i}. {var}: {contrib_tasa[var]:.4f}")
-                        
-                        else:
-                            # Para valor y tasa
-                            contrib_abs_valor = {k: abs(v) for k, v in contrib_valor.items() if k != 'valor_base'}
-                            top3_valor = sorted(contrib_abs_valor.items(), key=lambda x: x[1], reverse=True)[:3]
-                            
-                            contrib_abs_tasa = {k: abs(float(v)) for k, v in contrib_tasa.items() if k != 'tasa_base'}
-                            top3_tasa = sorted(contrib_abs_tasa.items(), key=lambda x: x[1], reverse=True)[:3]
-                            
-                            col_top1, col_top2 = st.columns(2)
-                            with col_top1:
-                                st.write("**Valor por m²:**")
-                                for i, (var, val) in enumerate(top3_valor, 1):
-                                    st.write(f"{i}. {var}: € {contrib_valor[var]:.0f}")
-                            
-                            with col_top2:
-                                st.write("**Tasa de descuento:**")
-                                for i, (var, val) in enumerate(top3_tasa, 1):
-                                    st.write(f"{i}. {var}: {contrib_tasa[var]:.4f}")
-                    
-                    # Botón de descarga
-                    resultado = {
+                    # Preparar resultado para descarga
+                    resultado_descarga = {
                         'fecha_calculo': datetime.now().isoformat(),
                         'codigo_municipio': codigo_municipio,
                         'superficie': superficie,
-                        'valor_m2': valor_m2,
-                        'valor_total': valor_total,
-                        'tasa_descuento': tasa_descuento,
-                        'prima_riesgo': prima_riesgo,
                         'modelo_usado': modelo_valor['nombre_modelo'],
-                        'contribuciones_valor': contrib_valor,
-                        'contribuciones_tasa': contrib_tasa,
-                        'contribuciones_prima': contrib_prima
                     }
+                    
+                    # Agregar solo los resultados calculados
+                    if es_modelo_valor:
+                        resultado_descarga.update({
+                            'valor_m2': resultados['valor_m2'],
+                            'valor_total': resultados['valor_total'],
+                            'contribuciones_valor': resultados['contrib_valor']
+                        })
+                    elif es_modelo_tasa:
+                        resultado_descarga.update({
+                            'tasa_descuento': resultados['tasa_descuento'],
+                            'contribuciones_tasa': resultados['contrib_tasa']
+                        })
+                    elif es_modelo_prima:
+                        resultado_descarga.update({
+                            'prima_riesgo': resultados['prima_riesgo'],
+                            'contribuciones_prima': resultados['contrib_prima']
+                        })
 
                     st.download_button(
                         "📥 Descargar Informe JSON",
-                        data=json.dumps(resultado, indent=2),
+                        data=json.dumps(resultado_descarga, indent=2),
                         file_name=f"tasacion_{codigo_municipio}_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
                         mime="application/json",
                         use_container_width=True
                     )
             else:
-                st.info("ℹ️ Complete los datos y haga clic en 'Calcular Valor y Tasa' para obtener resultados")
+                st.info("ℹ️ Complete los datos y haga clic en el botón para obtener resultados")
                 
 def pagina_tasacion_multiple():
     """Pestaña para tasación múltiple con validación avanzada"""
@@ -954,7 +936,10 @@ def pagina_tasacion_multiple():
                                     datos, modelo_valor, codigo_municipio
                                 )
                                 valor_total = valor_m2 * datos['superficie']
-                                tasa_descuento, contrib_tasa = st.session_state.modelo.calcular_tasa_descuento(datos)
+                                if modelo_nombre == 'testigos_tasa':
+                                    tasa_descuento, contrib_tasa = st.session_state.modelo.calcular_tasa_descuento(datos)
+                                else:
+                                    tasa_descuento = 0.0  # valor por defecto
                                 
                                 # Encontrar factores más influyentes
                                 contrib_abs = {k: abs(v) for k, v in contrib_valor.items() if k != 'valor_base'}
