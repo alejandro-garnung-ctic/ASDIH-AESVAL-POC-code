@@ -456,44 +456,6 @@ def mostrar_sidebar():
         </div>
         """, unsafe_allow_html=True)
 
-def obtener_codigos_disponibles():
-    """Obtiene todos los códigos de municipio disponibles en los modelos"""
-    modelos = st.session_state.modelos_json
-    codigos = set()
-    
-    for modelo in modelos.values():
-        if 'coeficientes_municipios' in modelo:
-            codigos.update(modelo['coeficientes_municipios'].keys())
-    
-    return sorted(list(codigos))
-
-def obtener_poblacion_por_codigo(codigo_municipio: str) -> int:
-    """Obtiene población aproximada basada en el código del municipio"""
-    # Mapeo simplificado de códigos a poblaciones (ejemplo)
-    poblaciones_por_codigo = {
-        # Códigos para municipios grandes (>200,000 hab)
-        "33021": 268000,  # Gijón
-        "33044": 215000,  # Oviedo
-        "33004": 76000,   # Avilés
-        # Códigos para municipios medianos (50,000-200,000)
-        "33036": 38000,   # Mieres
-        "33032": 39000,   # Langreo
-        "33066": 52000,   # Siero
-        # Códigos para municipios pequeños (<50,000)
-        "33016": 22000,   # Castrillón
-        "33020": 16000,   # Corvera
-        "33015": 10500,   # Carreño
-        "33025": 10500,   # Gozón
-        "33076": 14500,   # Villaviciosa
-        "33063": 1300,    # Sariego
-        "33006": 1700,    # Bimenes
-        "33042": 5200,    # Nava
-        "33008": 800,     # Cabranes
-        "33049": 7200     # Piloña
-    }
-    
-    return poblaciones_por_codigo.get(codigo_municipio, 50000)
-
 def pagina_tasacion_individual():
     """Pestaña para tasación individual con modelos reales"""
     st.header("📊 Tasación Individual - Modelo ECO 805")
@@ -685,14 +647,13 @@ def pagina_tasacion_individual():
                     if es_tasa_prima:
                         datos_inmueble = {
                             'superficie': superficie,
-                            'antiguedad': antiguedad,  # Variable continua para tasa/prima
+                            'antiguedad': antiguedad, # Variable continua para tasa/prima
                             'dormitorios': dormitorios,
                             'banos': banos,
                             'planta': planta,
                             'ascensor': ascensor,
-                            'rehabilitacion': rehabilitacion,  # Solo para tasa/prima
+                            'rehabilitacion': rehabilitacion, # Solo para tasa/prima
                             'calidad_alta': calidad_alta,
-                            # CONDICIÓN ACTUALIZADA: "Alta", "Buena", "Muy buena", "Óptima" = True
                             'estado_alto': estado_conservacion in ["Alta", "Buena", "Muy buena", "Óptima"]
                         }
                     else:
@@ -701,11 +662,10 @@ def pagina_tasacion_individual():
                             'dormitorios': dormitorios,
                             'banos': banos,
                             'planta': planta,
-                            'calefaccion': calefaccion,  # DCA - solo para valor
+                            'calefaccion': calefaccion, # DCA - solo para valor
                             'ascensor': ascensor,
-                            'vivienda_nueva': vivienda_nueva,  # Dnueva - solo para valor
+                            'vivienda_nueva': vivienda_nueva, # Dnueva - solo para valor
                             'calidad_alta': calidad_alta,
-                            # CONDICIÓN ACTUALIZADA: "Alta", "Buena", "Muy buena", "Óptima" = True
                             'estado_alto': estado_conservacion_valor in ["Alta", "Buena", "Muy buena", "Óptima"]
                         }
                     
