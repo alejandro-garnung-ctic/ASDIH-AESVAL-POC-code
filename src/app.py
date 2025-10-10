@@ -20,14 +20,31 @@ st.set_page_config(
 )
 
 # Ocultar menú de Streamlit
-hide_streamlit_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    </style>
-"""
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+# hide_streamlit_style = """
+#     <style>
+    
+#     /* Ocultar todo el header */
+#     header {
+#         opacity: 0;
+#     }
+    
+#     /* Mostrar solo el botón de expandir/contraer sidebar */
+#     button[data-testid="stExpandSidebarButton"] {
+#         display: block !important;
+#         position: fixed !important;
+#         top: 10px !important;
+#         left: 10px !important;
+#         z-index: 999999 !important;
+#         background: white !important;
+#         border: 1px solid #ccc !important;
+#         border-radius: 4px !important;
+#         padding: 8px !important;
+#         opacity: 1;
+#     }
+    
+#     </style>
+# """
+# st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 def cargar_configuracion_sistema():
     """Carga la configuración del sistema desde archivo YAML"""
@@ -154,7 +171,7 @@ class ModeloTasacion:
             for modelo_config in modelos_config:
                 clave = modelo_config.get('clave')
                 nombre = modelo_config.get('nombre')
-                if clave in self.modelos:  # Solo incluir modelos que estén cargados
+                if clave in self.modelos: # Solo incluir modelos que estén cargados
                     disponibles.append((clave, nombre))
             
             if disponibles:
@@ -394,7 +411,7 @@ def inicializar_session_state():
     if 'config_sistema' not in st.session_state:
         st.session_state.config_sistema = cargar_configuracion_sistema()
     
-    # NUEVO: Inicializar variables para persistencia de datos entre modelos
+    # Inicializar variables para persistencia de datos entre modelos
     if 'datos_persistentes' not in st.session_state:
         st.session_state.datos_persistentes = {
             'superficie': 80.0,
@@ -407,7 +424,9 @@ def inicializar_session_state():
             'calefaccion': True,
             'antiguedad': 15,
             'rehabilitacion': False,
-            'estado_conservacion': "Buena"
+            'estado_conservacion': "Buena",
+            'codigo_municipio': '2005', 
+            'modelo_seleccionado': 'testigos_menos_10000' 
         }
 
 def mostrar_header():
@@ -466,17 +485,15 @@ def mostrar_sidebar():
         
         st.markdown("### ℹ️ Información del Sistema")
         st.info(f"""
-        **Versión:** {sistema.get('version', '2.0')}
-        **Actualización:** {sistema.get('actualizacion', '2025-01-10')}
-        **Modelo:** {sistema.get('modelo', 'ECO 805 - Análisis Econométrico')}
+        **Versión:** {sistema.get('version', '2.0')}\n
+        **Actualización:** {sistema.get('actualizacion', '2025-01-10')}\n
+        **Modelo:** {sistema.get('modelo', 'ECO 805 - Análisis Econométrico')}\n
         **Base de datos:** {sistema.get('base_datos', '205,000+ testigos')}
         """)
         
         col1, col2 = st.columns(2)
         with col1:
             st.metric("R² Promedio", metricas.get('r2_promedio', '82%'))
-        with col2:
-            st.metric("Precisión", metricas.get('precision', '97.2%'))
         
         st.markdown("---")
         st.markdown("### 📈 Modelos Disponibles")
@@ -495,7 +512,7 @@ def mostrar_sidebar():
         """, unsafe_allow_html=True)
 
 def pagina_tasacion_individual():
-    """Pestaña para tasación individual con modelos reales"""
+    """Pestaña para tasación individual con modelos reales - VERSIÓN CORREGIDA"""
     st.header("📊 Tasación Individual - Modelo ECO 805")
     
     with st.container():
@@ -519,12 +536,21 @@ def pagina_tasacion_individual():
                     st.error("❌ No se cargaron modelos. Verifique los archivos JSON en config/")
                     st.stop()
                 
+                # Obtener modelo actual de datos persistentes
+                modelo_actual = st.session_state.datos_persistentes.get('modelo_seleccionado', 'testigos_menos_10000')
+                
                 modelo_seleccionado = st.selectbox(
                     "Seleccione el modelo",
                     options=[clave for clave, _ in modelos_disponibles],
                     format_func=lambda x: next((nombre for clave, nombre in modelos_disponibles if clave == x), x),
-                    help="Elija el modelo econométrico según el tamaño del municipio"
+                    help="Elija el modelo econométrico según el tamaño del municipio",
+                    key="selectbox_modelo",
+                    index=[clave for clave, _ in modelos_disponibles].index(modelo_actual) if modelo_actual in [clave for clave, _ in modelos_disponibles] else 0
                 )
+                
+                # ACTUALIZAR DATOS PERSISTENTES INMEDIATAMENTE cuando cambia el modelo
+                if modelo_seleccionado != st.session_state.datos_persistentes.get('modelo_seleccionado'):
+                    st.session_state.datos_persistentes['modelo_seleccionado'] = modelo_seleccionado
                 
                 # Determinar tipo de modelo
                 es_tasa_prima = es_modelo_tasa_o_prima(modelo_seleccionado)
@@ -540,40 +566,56 @@ def pagina_tasacion_individual():
                     st.error("❌ El modelo seleccionado no tiene códigos de municipio disponibles")
                     st.stop()
                 
+                # Obtener municipio actual de datos persistentes
+                municipio_actual = st.session_state.datos_persistentes.get('codigo_municipio', '2005')
+                
+                # Si el municipio actual no está disponible en el nuevo modelo, resetear al primero disponible
+                if municipio_actual not in codigos_disponibles:
+                    municipio_actual = codigos_disponibles[0]
+                    st.session_state.datos_persistentes['codigo_municipio'] = municipio_actual
+                
                 codigo_municipio = st.selectbox(
                     "Código de Municipio",
                     options=codigos_disponibles,
+                    index=codigos_disponibles.index(municipio_actual),
                     help="Seleccione el código del municipio",
-                    key="codigo_municipio"
+                    key="selectbox_municipio"
                 )
                 
+                # ACTUALIZAR DATOS PERSISTENTES cuando cambia el municipio
+                if codigo_municipio != st.session_state.datos_persistentes.get('codigo_municipio'):
+                    st.session_state.datos_persistentes['codigo_municipio'] = codigo_municipio
+                
                 # CAMPOS COMUNES A TODOS LOS MODELOS (siempre visibles)
+                # Usar valores de datos persistentes como valores por defecto
+                datos_persistentes = st.session_state.datos_persistentes
+                
                 superficie = st.number_input(
                     "Superficie construida (m²)", 
                     min_value=20.0, 
                     max_value=1000.0,
-                    value=st.session_state.datos_persistentes['superficie'],
+                    value=datos_persistentes.get('superficie', 80.0),
                     step=0.5,
                     help="Superficie total construida en metros cuadrados",
-                    key="superficie"
+                    key="input_superficie"
                 )
                 
                 dormitorios = st.number_input(
                     "Número de dormitorios",
                     min_value=1,
                     max_value=10,
-                    value=st.session_state.datos_persistentes['dormitorios'],
+                    value=datos_persistentes.get('dormitorios', 3),
                     help="Número total de dormitorios (variable ND)",
-                    key="dormitorios"
+                    key="input_dormitorios"
                 )
                 
                 banos = st.number_input(
                     "Número de baños",
                     min_value=1,
                     max_value=6,
-                    value=st.session_state.datos_persistentes['banos'],
+                    value=datos_persistentes.get('banos', 2),
                     help="Número total de baños (variable NB)",
-                    key="banos"
+                    key="input_banos"
                 )
                 
                 # CAMPOS ESPECÍFICOS SEGÚN TIPO DE MODELO
@@ -581,24 +623,24 @@ def pagina_tasacion_individual():
                     # CAMPOS PARA MODELOS DE VALOR
                     vivienda_nueva = st.checkbox(
                         "Vivienda nueva (<5 años)", 
-                        value=st.session_state.datos_persistentes['vivienda_nueva'],
+                        value=datos_persistentes.get('vivienda_nueva', False),
                         help="Menos de 5 años de antigüedad (variable Dnueva)",
-                        key="vivienda_nueva"
+                        key="input_vivienda_nueva"
                     )
                     
                     calefaccion = st.checkbox(
                         "Calefacción", 
-                        value=st.session_state.datos_persistentes['calefaccion'],
+                        value=datos_persistentes.get('calefaccion', True),
                         help="¿Tiene sistema de calefacción? (variable DCA)",
-                        key="calefaccion"
+                        key="input_calefaccion"
                     )
                     
                     estado_conservacion_valor = st.select_slider(
                         "Estado de conservación",
                         options=["Muy deficiente", "Deficiente", "Regular", "Buena", "Muy buena", "Óptima"],
-                        value=st.session_state.datos_persistentes['estado_conservacion'],
+                        value=datos_persistentes.get('estado_conservacion', "Buena"),
                         help="Estado general de conservación del inmueble",
-                        key="estado_conservacion_valor"
+                        key="input_estado_conservacion_valor"
                     )
                 
                 else:
@@ -607,24 +649,24 @@ def pagina_tasacion_individual():
                         "Antigüedad (años)", 
                         min_value=0, 
                         max_value=200,
-                        value=st.session_state.datos_persistentes['antiguedad'],
+                        value=datos_persistentes.get('antiguedad', 15),
                         help="Años desde la construcción del inmueble (variable antig)",
-                        key="antiguedad"
+                        key="input_antiguedad"
                     )
                     
                     rehabilitacion = st.checkbox(
                         "Rehabilitación del edificio", 
-                        value=st.session_state.datos_persistentes['rehabilitacion'],
+                        value=datos_persistentes.get('rehabilitacion', False),
                         help="¿El edificio ha sido rehabilitado? (variable rehab)",
-                        key="rehabilitacion"
+                        key="input_rehabilitacion"
                     )
                     
                     estado_conservacion = st.select_slider(
                         "Estado de conservación",
                         options=["Muy deficiente", "Deficiente", "Regular", "Buena", "Muy buena", "Óptima"],
-                        value=st.session_state.datos_persistentes['estado_conservacion'],
+                        value=datos_persistentes.get('estado_conservacion', "Buena"),
                         help="Estado general de conservación del inmueble (variable EC_Alto)",
-                        key="estado_conservacion_tasa"
+                        key="input_estado_conservacion_tasa"
                     )
             
             with col1_2:
@@ -633,42 +675,58 @@ def pagina_tasacion_individual():
                     "Planta",
                     min_value=0,
                     max_value=20,
-                    value=st.session_state.datos_persistentes['planta'],
+                    value=datos_persistentes.get('planta', 2),
                     help="Planta en la que se ubica el inmueble (variable PLbis)",
-                    key="planta"
+                    key="input_planta"
                 )
                 
                 ascensor = st.checkbox(
                     "Ascensor", 
-                    value=st.session_state.datos_persistentes['ascensor'],
+                    value=datos_persistentes.get('ascensor', True),
                     help="¿El edificio tiene ascensor? (variable DAS)",
-                    key="ascensor"
+                    key="input_ascensor"
                 )
-                
+                        
                 calidad_alta = st.checkbox(
                     "Calidad constructiva alta", 
-                    value=st.session_state.datos_persistentes['calidad_alta'],
+                    value=datos_persistentes.get('calidad_alta', False),
                     help="Calidad de materiales y acabados alta (variable CC_Alta)",
-                    key="calidad_alta"
+                    key="input_calidad_alta"
                 )
-                
+
                 # Botón para actualizar datos persistentes
                 if st.button("💾 Guardar valores actuales", use_container_width=True):
                     # Actualizar datos persistentes con los valores actuales
-                    st.session_state.datos_persistentes.update({
+                    datos_actualizados = {
                         'superficie': superficie,
                         'dormitorios': dormitorios,
                         'banos': banos,
                         'planta': planta,
                         'ascensor': ascensor,
                         'calidad_alta': calidad_alta,
-                        'vivienda_nueva': vivienda_nueva if es_modelo_valor else st.session_state.datos_persistentes['vivienda_nueva'],
-                        'calefaccion': calefaccion if es_modelo_valor else st.session_state.datos_persistentes['calefaccion'],
-                        'antiguedad': antiguedad if not es_modelo_valor else st.session_state.datos_persistentes['antiguedad'],
-                        'rehabilitacion': rehabilitacion if not es_modelo_valor else st.session_state.datos_persistentes['rehabilitacion'],
-                        'estado_conservacion': estado_conservacion_valor if es_modelo_valor else estado_conservacion
-                    })
+                        'codigo_municipio': codigo_municipio,
+                        'modelo_seleccionado': modelo_seleccionado
+                    }
+                    
+                    # Agregar campos específicos según el tipo de modelo
+                    if es_modelo_valor:
+                        datos_actualizados.update({
+                            'vivienda_nueva': vivienda_nueva,
+                            'calefaccion': calefaccion,
+                            'estado_conservacion': estado_conservacion_valor
+                        })
+                    else:
+                        datos_actualizados.update({
+                            'antiguedad': antiguedad,
+                            'rehabilitacion': rehabilitacion,
+                            'estado_conservacion': estado_conservacion
+                        })
+                    
+                    st.session_state.datos_persistentes.update(datos_actualizados)
                     st.success("✅ Valores guardados para uso entre modelos")
+                    
+                    # Forzar rerun para aplicar cambios inmediatamente
+                    st.rerun()
     
     with col2:
         with st.container():
@@ -854,7 +912,7 @@ def pagina_tasacion_individual():
                     )
             else:
                 st.info("ℹ️ Complete los datos y haga clic en el botón para obtener resultados")
-                
+                                
 def pagina_tasacion_multiple():
     """Pestaña para tasación múltiple con validación avanzada"""
     st.header("📁 Tasación Múltiple por Lotes")
@@ -1066,7 +1124,6 @@ def pagina_documentacion():
         
     config = st.session_state.config_sistema
     doc_config = config.get('documentacion', {})
-    modelos_config = config.get('modelos_disponibles', [])
     
     st.header("📚 Documentación Técnica - Modelos ECO 805")
     
@@ -1169,26 +1226,36 @@ def pagina_documentacion():
         - Calidad constructiva: efecto variable
         """)
     
-    # Segmentación por población
+    # Segmentación por población - CORRECCIÓN: Leer R² desde modelos_disponibles
     st.subheader("🏙️ Segmentación por Tamaño Municipal")
     
     col_seg1, col_seg2, col_seg3, col_seg4 = st.columns(4)
     
-    with col_seg1:
-        st.metric("< 10,000 hab", "R² = 0.78", "Modelo más estable")
-    with col_seg2:
-        st.metric("10,000-50,000", "R² = 0.82", "Balanceado")
-    with col_seg3:
-        st.metric("50,000-200,000", "R² = 0.85", "Alta precisión")
-    with col_seg4:
-        st.metric("> 200,000 hab", "R² = 0.88", "Máxima granularidad")
+    # Obtener modelos disponibles desde la configuración
+    modelos_config = config.get('modelos_disponibles', [])
     
+    # Buscar los R² específicos para cada modelo de valor
+    r2_menos_10000 = next((modelo.get('r2', '76.32%') for modelo in modelos_config if modelo.get('clave') == 'testigos_menos_10000'), '76.32%')
+    r2_10000_50000 = next((modelo.get('r2', '73.89%') for modelo in modelos_config if modelo.get('clave') == 'testigos_10000_50000'), '73.89%')
+    r2_50000_200000 = next((modelo.get('r2', '67.18%') for modelo in modelos_config if modelo.get('clave') == 'testigos_50000_200000'), '67.18%')
+    r2_mas_200000 = next((modelo.get('r2', '61.95%') for modelo in modelos_config if modelo.get('clave') == 'testigos_mas_200000'), '61.95%')
+
+    with col_seg1:
+        st.metric("< 10,000 hab", f"R² = {r2_menos_10000}", "Mayor poder explicativo")
+    with col_seg2:
+        st.metric("10,000-50,000", f"R² = {r2_10000_50000}", "Alta significatividad")
+    with col_seg3:
+        st.metric("50,000-200,000", f"R² = {r2_50000_200000}", "Modelo robusto")
+    with col_seg4:
+        st.metric("> 200,000 hab", f"R² = {r2_mas_200000}", "Máxima complejidad")
+
     st.markdown("""
-    **Efectos Diferenciales por Segmento:**
-    - **Superficie**: Negativo en municipios pequeños, positivo en grandes
-    - **Dormitorios**: Efecto negativo se intensifica con tamaño municipal
-    - **Ascensor**: Impacto creciente con tamaño municipal
-    - **Planta**: Mayor valoración en municipios grandes
+    **Hallazgos clave de los modelos econométricos:**
+    - **R² decreciente con tamaño municipal**: Mayor poder explicativo en municipios pequeños (76.32%) vs grandes (61.95%)
+    - **Efecto superficie (SU)**: Negativo en municipios <200k hab, positivo en grandes ciudades
+    - **Dormitorios (ND)**: Efecto negativo consistente en todos los modelos
+    - **Variables positivas**: Baños (NB), ascensor (DAS), calidad alta (CC_Alta) y calefacción (DCA) siempre positivas
+    - **Planta (PLbis)**: Efecto positivo que se intensifica con el tamaño municipal
     """)
 
 def mostrar_footer():
@@ -1205,8 +1272,8 @@ def mostrar_footer():
     with col2:
         st.markdown(
             f"""
-            <div style='text-align: center; color: #666; padding: 2rem 0;'>
-                <p style='margin-bottom: 0.5rem; font-size: 0.9rem;'>
+            <div style='text-align: center; color: #666; padding:0;'>
+                <p style='margin-bottom: 0; font-size: 0.9rem;'>
                     © {sistema_info.get('año', current_year)} <strong>{sistema_info.get('desarrollador', 'AESVAL - CTIC')}</strong> | 
                     {sistema_info.get('nombre', 'Sistema de Tasación Automático')} {sistema_info.get('version', 'v2.0')}
                 </p>

@@ -19,7 +19,7 @@ modelos:
     nombre: "Municipios pequeños (< 10,000 hab) - Base Testigos"
     rango_poblacion: "menos_10000"
     tipo: "testigos"
-    r2: 0.78
+    r2: 0.7632
     coeficientes:
       intercepto: 1678.676
       vivienda_nueva: 170.659
@@ -35,7 +35,7 @@ modelos:
     nombre: "Municipios medianos (10,000-50,000 hab) - Base Testigos"
     rango_poblacion: "10000_50000"
     tipo: "testigos"
-    r2: 0.82
+    r2: 0.7389
     coeficientes:
       intercepto: 1045.291
       vivienda_nueva: 260.990
@@ -51,7 +51,7 @@ modelos:
     nombre: "Municipios grandes (50,000-200,000 hab) - Base Testigos"
     rango_poblacion: "50000_200000"
     tipo: "testigos"
-    r2: 0.85
+    r2: 0.6718
     coeficientes:
       intercepto: 1345.272
       vivienda_nueva: 338.113
@@ -67,7 +67,7 @@ modelos:
     nombre: "Municipios metropolitanos (> 200,000 hab) - Base Testigos"
     rango_poblacion: "mas_200000"
     tipo: "testigos"
-    r2: 0.88
+    r2: 0.6195
     coeficientes:
       intercepto: 1410.693
       vivienda_nueva: 161.305
@@ -83,7 +83,7 @@ modelos:
   tasa_descuento:
     nombre: "Modelo Tasa de Descuento - Base Testigos 2018-2024"
     tipo: "tasa_descuento"
-    r2: 0.76
+    r2: 0.5572
     coeficientes:
       intercepto: 0.048
       superficie: 0.00008
@@ -98,7 +98,7 @@ modelos:
   prima_riesgo:
     nombre: "Modelo Prima de Riesgo - Base Testigos 2018-2024"
     tipo: "prima_riesgo"
-    r2: 0.71
+    r2: 0.4671
     coeficientes:
       intercepto: 0.037
       antiguedad: 0.00009
@@ -106,25 +106,3 @@ modelos:
       dormitorios: 0.002
       estado_alto: -0.004
       ascensor: -0.008
-
-factores_correccion:
-  estado_conservacion:
-    muy_deficiente: 0.70
-    deficiente: 0.80
-    regular: 0.90
-    bueno: 1.00
-    muy_bueno: 1.10
-    excelente: 1.20
-  
-  calidad_constructiva:
-    basica: 0.85
-    media: 1.00
-    alta: 1.15
-    lujo: 1.35
-
-  tipo_inmueble:
-    vivienda_unifamiliar: 1.10
-    vivienda_bloque: 1.00
-    local_comercial: 0.95
-    oficina: 1.05
-    industrial: 0.90
