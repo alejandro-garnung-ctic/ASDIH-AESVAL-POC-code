@@ -118,13 +118,10 @@ sudo netstat -tulpn | grep 8501
 # TODO
 
 - Hacer un comando agnóstico a SO para lanzar el contenedor sea con .sh o .bat
-- Meter la ecuación correcta de los modelos y sus parámetros, bien diferenciados en /models
-- Arreglar la generación de pdf
-- Arreglar la descarga de la plantilla tipo, o bien ponerla como asset y añadirla estáticamente como recurso. Hacer la plantilla ya en excel, no hacerla por código en lo de col2...
-- Eliminar los .py del models/? Igual teniendo el yaml no hace falta ya
 - Cambiar completamente el enfoque del código para que cómo se calcule el valor, y los parámetros del modelo, no estén en el código. Ello se especificaría directamente en los archivos json o yaml de config (ecuación, parámetros, modelo...), así todo queda configurable incluso en tiempo real, sin necesidad de recompilar para añadir o quitar parámetros o ecuaciones o modelos. Esto resolvería problema de si queremos cambiar e.g. que Los modelos de valor muestran: Dnueva, SU, DCA, ND, NB, CC_Alta, DAS, PLbis y Los modelos de Tasa/Prima muestran: SU, antig, NB, ND, CC_Alta, EC_Alto, rehab, DAS, PLbis
 - DUDA: El usuario solo debería escoger entre los modelos de testigos en función de la población? Es decir, podría escoger también el modelo de prima o el de tasa? O estos dos último SIEMPRE se deberían calcular junto con el escogido de los testigos por población?
 - Añadir una Root MSE promedio además de la precisión al lateral de información?
-- Revisar qué rangos razonables de los valores (clamp) poner, si es que se requieren poner.
-- Limitación actual: ¿Cómo vamos a calcular la tasa de descuento para un CODIGOINTEGRADO que no está en el modelo? => Ahora mismo NO PODEMOS; ellos tendrían que buscar una solución adecuada (e.g. diferenciar modelos  de segmentar por nº habitantes también).
-- Arreglar lo de ocultar lo de Deploy y header de streamlin excepto el botón de desplegar sidebar de nuevo.
+- DUDA: Revisar qué rangos razonables de tasa y prima de los valores (clamp) poner, si es que se requieren poner.
+- DUDA: Limitación actual: ¿Cómo vamos a calcular la tasa de descuento para un CODIGOINTEGRADO que no está en el modelo? => Ahora mismo NO PODEMOS; ellos tendrían que buscar una solución adecuada (e.g. diferenciar modelos  de segmentar por nº habitantes también).
+- Arreglar lo de ocultar lo de Deploy y header de streamlit excepto el botón de desplegar sidebar de nuevo.
+- Añadir una Política de privacidad y Términos de uso

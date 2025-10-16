@@ -702,40 +702,6 @@ def pagina_tasacion_individual():
                     key="input_calidad_alta"
                 )
 
-                # Botón para actualizar datos persistentes
-                if st.button("💾 Guardar valores actuales", use_container_width=True):
-                    # Actualizar datos persistentes con los valores actuales
-                    datos_actualizados = {
-                        'superficie': superficie,
-                        'dormitorios': dormitorios,
-                        'banos': banos,
-                        'planta': planta,
-                        'ascensor': ascensor,
-                        'calidad_alta': calidad_alta,
-                        'codigo_municipio': codigo_municipio,
-                        'modelo_seleccionado': modelo_seleccionado
-                    }
-                    
-                    # Agregar campos específicos según el tipo de modelo
-                    if es_modelo_valor:
-                        datos_actualizados.update({
-                            'vivienda_nueva': vivienda_nueva,
-                            'calefaccion': calefaccion,
-                            'estado_conservacion': estado_conservacion_valor
-                        })
-                    else:
-                        datos_actualizados.update({
-                            'antiguedad': antiguedad,
-                            'rehabilitacion': rehabilitacion,
-                            'estado_conservacion': estado_conservacion
-                        })
-                    
-                    st.session_state.datos_persistentes.update(datos_actualizados)
-                    st.success("✅ Valores guardados para uso entre modelos")
-                    
-                    # Forzar rerun para aplicar cambios inmediatamente
-                    st.rerun()
-    
     with col2:
         with st.container():
             st.subheader("🎯 Calcular Tasación")
@@ -917,7 +883,7 @@ def pagina_tasacion_individual():
 
                     st.download_button(
                         "📥 Descargar Informe JSON",
-                        data=json.dumps(resultado_descarga, indent=2),
+                        data=json.dumps(resultado_descarga, indent=2, ensure_ascii=False),
                         file_name=f"tasacion_{codigo_municipio}_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
                         mime="application/json",
                         use_container_width=True
@@ -1444,7 +1410,7 @@ def pagina_documentacion():
     col_metodo1, col_metodo2 = st.columns(2)
     
     with col_metodo1:
-        st.markdown("**Base de Datos:**")
+        st.markdown("**Bases de Datos:**")
         for item in doc_config.get('metodologia', {}).get('base_datos', []):
             st.write(f"- {item}")
         
