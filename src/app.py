@@ -262,8 +262,8 @@ class ModeloTasacion:
         
         return valor_final, contribuciones_porcentaje # ← Devuelve porcentajes
     
-    def calcular_tasa_descuento(self, datos: Dict) -> Tuple[float, Dict]:
-        """Calcula la tasa de descuento usando el modelo correspondiente"""
+    def calcular_tasa_descuento(self, datos: Dict, codigo_municipio: str) -> Tuple[float, Dict]:
+        """Calcula la tasa de descuento usando el modelo correspondiente INCLUYENDO MUNICIPIO"""
         
         # Obtener el modelo de tasa desde los JSON cargados
         modelo_tasa = self.modelos.get('testigos_tasa')
@@ -272,13 +272,17 @@ class ModeloTasacion:
             return 0.05, {}
         
         # Usar los coeficientes reales del modelo JSON
+        coef_municipio = modelo_tasa['coeficientes_municipios'].get(str(codigo_municipio), 0)
         coef_variables = modelo_tasa['coeficientes_variables']
         _cons = modelo_tasa['_cons']
         
         contribuciones = {}
         contribuciones_porcentaje = {}
-        tasa_base = _cons
+        
+        # Tasa base (constante + efecto municipio)
+        tasa_base = _cons + coef_municipio
         contribuciones['tasa_base'] = tasa_base
+        contribuciones[f'municipio_{codigo_municipio}'] = coef_municipio
         
         # Aplicar coeficientes según variables disponibles usando los coeficientes reales
         if 'SU' in coef_variables and coef_variables['SU'] is not None and datos.get('superficie'):
@@ -331,8 +335,8 @@ class ModeloTasacion:
         
         return tasa_final, contribuciones_porcentaje
 
-    def calcular_prima_riesgo(self, datos: Dict) -> Tuple[float, Dict]:
-        """Calcula la prima de riesgo usando el modelo correspondiente"""
+    def calcular_prima_riesgo(self, datos: Dict, codigo_municipio: str) -> Tuple[float, Dict]:
+        """Calcula la prima de riesgo usando el modelo correspondiente INCLUYENDO MUNICIPIO"""
         
         # Obtener el modelo de prima desde los JSON cargados
         modelo_prima = self.modelos.get('testigos_prima')
@@ -341,13 +345,17 @@ class ModeloTasacion:
             return 0.02, {}
         
         # Usar los coeficientes reales del modelo JSON
+        coef_municipio = modelo_prima['coeficientes_municipios'].get(str(codigo_municipio), 0)
         coef_variables = modelo_prima['coeficientes_variables']
         _cons = modelo_prima['_cons']
         
         contribuciones = {}
         contribuciones_porcentaje = {}
-        prima_base = _cons
+        
+        # Prima base (constante + efecto municipio)
+        prima_base = _cons + coef_municipio
         contribuciones['prima_base'] = prima_base
+        contribuciones[f'municipio_{codigo_municipio}'] = coef_municipio
         
         # Aplicar coeficientes según variables disponibles usando los coeficientes reales
         if 'SU' in coef_variables and coef_variables['SU'] is not None and datos.get('superficie'):
@@ -803,16 +811,20 @@ def pagina_tasacion_individual():
                         })
                     
                     elif es_modelo_tasa:
-                        # Solo calcular tasa para modelo de tasa
-                        tasa_descuento, contrib_tasa = st.session_state.modelo.calcular_tasa_descuento(datos_inmueble)
+                        # Solo calcular tasa para modelo de tasa 
+                        tasa_descuento, contrib_tasa = st.session_state.modelo.calcular_tasa_descuento(
+                            datos_inmueble, codigo_municipio
+                        )
                         resultados.update({
                             'tasa_descuento': tasa_descuento,
                             'contrib_tasa': contrib_tasa
                         })
-                    
+
                     elif es_modelo_prima:
-                        # Solo calcular prima para modelo de prima
-                        prima_riesgo, contrib_prima = st.session_state.modelo.calcular_prima_riesgo(datos_inmueble)
+                        # Solo calcular prima para modelo de prima 
+                        prima_riesgo, contrib_prima = st.session_state.modelo.calcular_prima_riesgo(
+                            datos_inmueble, codigo_municipio
+                        )
                         resultados.update({
                             'prima_riesgo': prima_riesgo,
                             'contrib_prima': contrib_prima
@@ -912,32 +924,192 @@ def pagina_tasacion_individual():
                     )
             else:
                 st.info("ℹ️ Complete los datos y haga clic en el botón para obtener resultados")
-                                
+
+def validar_fila_para_modelo(fila: pd.Series, modelo_clave: str) -> Tuple[bool, List[str]]:
+    """Valida que una fila tenga las columnas requeridas para el modelo especificado"""
+    errores = []
+    
+    # Columnas requeridas para todos los modelos
+    columnas_requeridas_base = ['codigo_municipio', 'superficie', 'dormitorios', 'banos', 'planta']
+    
+    # Columnas específicas por tipo de modelo
+    if es_modelo_tasa_o_prima(modelo_clave):
+        # Modelos de tasa/prima requieren antiguedad
+        columnas_requeridas = columnas_requeridas_base + ['antiguedad']
+    else:
+        # Modelos de valor requieren calefaccion, vivienda_nueva
+        columnas_requeridas = columnas_requeridas_base + ['calefaccion', 'vivienda_nueva']
+    
+    # Verificar columnas requeridas
+    for columna in columnas_requeridas:
+        if columna not in fila.index:
+            errores.append(f"Falta columna requerida: {columna}")
+        elif pd.isna(fila[columna]):
+            errores.append(f"Valor faltante en columna: {columna}")
+    
+    # Validar tipos de datos básicos
+    if 'superficie' in fila and not pd.isna(fila['superficie']):
+        try:
+            float(fila['superficie'])
+        except (ValueError, TypeError):
+            errores.append("Superficie debe ser numérica")
+    
+    if 'codigo_municipio' in fila and not pd.isna(fila['codigo_municipio']):
+        try:
+            str(fila['codigo_municipio'])
+        except (ValueError, TypeError):
+            errores.append("Código municipio debe ser texto o número")
+    
+    return len(errores) == 0, errores
+
+def procesar_fila_multiple(fila: pd.Series, modelo_tasacion, modelos_json: Dict) -> Tuple[bool, Dict, str]:
+    """Procesa una fila individual del Excel y retorna resultado o error"""
+    try:
+        # Validar que la fila tenga modelo
+        if 'modelo' not in fila or pd.isna(fila['modelo']):
+            return False, {}, "Falta especificar el modelo"
+        
+        modelo_clave = str(fila['modelo'])
+        
+        # Validar fila para el modelo específico
+        es_valida, errores_validacion = validar_fila_para_modelo(fila, modelo_clave)
+        if not es_valida:
+            return False, {}, f"Errores validación: {', '.join(errores_validacion)}"
+        
+        # Obtener modelo
+        modelo_obj = modelos_json.get(modelo_clave)
+        if not modelo_obj:
+            return False, {}, f"Modelo '{modelo_clave}' no encontrado"
+        
+        # Preparar datos según tipo de modelo
+        codigo_municipio = str(fila['codigo_municipio'])
+        superficie = float(fila['superficie'])
+        
+        if es_modelo_tasa_o_prima(modelo_clave):
+            # Modelo de tasa o prima
+            datos = {
+                'superficie': superficie,
+                'antiguedad': float(fila.get('antiguedad', 0)),
+                'dormitorios': int(fila.get('dormitorios', 0)),
+                'banos': int(fila.get('banos', 0)),
+                'planta': int(fila.get('planta', 0)),
+                'ascensor': bool(fila.get('ascensor', False)),
+                'rehabilitacion': bool(fila.get('rehabilitacion', False)),
+                'calidad_alta': bool(fila.get('calidad_alta', False)),
+                'estado_alto': fila.get('estado_conservacion', '') in ["Buena", "Muy buena", "Óptima"],
+                'vivienda_nueva': bool(fila.get('vivienda_nueva', False))
+            }
+            
+            if modelo_clave == 'testigos_tasa':
+                resultado, contribuciones = modelo_tasacion.calcular_tasa_descuento(datos, codigo_municipio)
+                return True, {
+                    'tipo': 'tasa',
+                    'valor': resultado,
+                    'contribuciones': contribuciones,
+                    'modelo': modelo_obj['nombre_modelo'],
+                    'codigo_municipio': codigo_municipio,
+                    'superficie': superficie
+                }, ""
+            else: # testigos_prima
+                resultado, contribuciones = modelo_tasacion.calcular_prima_riesgo(datos, codigo_municipio)
+                return True, {
+                    'tipo': 'prima',
+                    'valor': resultado,
+                    'contribuciones': contribuciones,
+                    'modelo': modelo_obj['nombre_modelo'],
+                    'codigo_municipio': codigo_municipio,
+                    'superficie': superficie
+                }, ""
+        else:
+            # Modelo de valor (ya estaba correcto)
+            datos = {
+                'superficie': superficie,
+                'dormitorios': int(fila.get('dormitorios', 0)),
+                'banos': int(fila.get('banos', 0)),
+                'planta': int(fila.get('planta', 0)),
+                'calefaccion': bool(fila.get('calefaccion', False)),
+                'ascensor': bool(fila.get('ascensor', False)),
+                'vivienda_nueva': bool(fila.get('vivienda_nueva', False)),
+                'calidad_alta': bool(fila.get('calidad_alta', False)),
+                'estado_alto': fila.get('estado_conservacion', '') in ["Buena", "Muy buena", "Óptima"]
+            }
+            
+            valor_m2, contribuciones = modelo_tasacion.calcular_valor_m2(datos, modelo_obj, codigo_municipio)
+            valor_total = valor_m2 * superficie
+            
+            return True, {
+                'tipo': 'valor',
+                'valor_m2': valor_m2,
+                'valor_total': valor_total,
+                'contribuciones': contribuciones,
+                'modelo': modelo_obj['nombre_modelo'],
+                'codigo_municipio': codigo_municipio,
+                'superficie': superficie
+            }, ""
+            
+    except Exception as e:
+        return False, {}, f"Error en procesamiento: {str(e)}"
+
+def crear_plantilla_fallback():
+    # Datos de ejemplo mínimos
+    sample_data = {
+        'modelo': ['testigos_menos_10000', 'testigos_tasa'],
+        'codigo_municipio': ['2005', '2006'],
+        'superficie': [85.5, 120.0],
+        'dormitorios': [3, 4],
+        'banos': [2, 3],
+        'planta': [2, 3],
+        'calefaccion': [True, ''],
+        'ascensor': [True, False],
+        'vivienda_nueva': [False, ''],
+        'antiguedad': ['', 15],
+        'rehabilitacion': ['', True],
+        'calidad_alta': [False, False],
+        'estado_conservacion': ['Buena', 'Buena']
+    }
+    
+    df_fallback = pd.DataFrame(sample_data)
+    
+    # Crear Excel en memoria
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_fallback.to_excel(writer, index=False, sheet_name='Plantilla')
+    
+    excel_data = output.getvalue()
+    
+    st.download_button(
+        "📥 Descargar plantilla básica",
+        data=excel_data,
+        file_name="plantilla_tasacion_basica.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+    
 def pagina_tasacion_multiple():
-    """Pestaña para tasación múltiple con validación avanzada"""
+    """Pestaña para tasación múltiple con validación avanzada por modelo"""
     st.header("📁 Tasación Múltiple por Lotes")
     
     with st.expander("ℹ️ Información sobre tasación múltiple", expanded=True):
         st.markdown("""
         **Características de la tasación por lotes:**
         - Procesamiento simultáneo de múltiples inmuebles usando modelos econométricos
-        - Validación automática de datos y formato
-        - Detección y reporte de errores por fila
+        - Validación automática por tipo de modelo especificado en cada fila
+        - Detección y reporte de errores por fila con mensajes específicos
         - Generación de informe consolidado con análisis de contribuciones
         - Límite: 500 registros por lote
         
-        **Columnas requeridas en el Excel:**
-        - `modelo`: Nombre del modelo (testigos_menos_10000, testigos_10000_50000, etc.)
+        **Columnas comunes requeridas en el Excel:**
+        - `modelo`: Tipo de modelo (testigos_menos_10000, testigos_tasa, testigos_prima, etc.)
         - `codigo_municipio`: Código del municipio (ej: 2005, 2006, etc.)
         - `superficie`: Superficie en m² (número)
-        - `antiguedad`: Años desde construcción (número)
-        - `dormitorios`: Número de dormitorios (número)
-        - `banos`: Número de baños (número)
-        - `planta`: Planta del inmueble (número)
-        - `calefaccion`: Sí/No o 1/0
-        - `ascensor`: Sí/No o 1/0
-        - `vivienda_nueva`: Sí/No o 1/0
-        - `calidad_alta`: Sí/No o 1/0
+        
+        **Columnas requeridas según tipo de modelo:**
+        
+        **Para modelos de VALOR (testigos_menos_10000, testigos_10000_50000, etc.):**
+        - `dormitorios`, `banos`, `planta`, `calefaccion`, `ascensor`, `vivienda_nueva`, `calidad_alta`, `estado_conservacion`
+        
+        **Para modelos de TASA/PRIMA (testigos_tasa, testigos_prima):**
+        - `dormitorios`, `banos`, `planta`, `ascensor`, `antiguedad`, `rehabilitacion`, `calidad_alta`, `estado_conservacion`
         """)
     
     col1, col2 = st.columns([2, 1])
@@ -946,20 +1118,16 @@ def pagina_tasacion_multiple():
         uploaded_file = st.file_uploader(
             "📤 Subir archivo Excel para tasación múltiple", 
             type=['xlsx', 'xls'],
-            help="El archivo debe contener las columnas requeridas en el formato especificado"
+            help="El archivo debe contener las columnas requeridas según el tipo de modelo especificado en cada fila"
         )
         
         if uploaded_file is not None:
             try:
                 df = pd.read_excel(uploaded_file)
                 
-                # Validar columnas requeridas
-                columnas_requeridas = ['codigo_municipio', 'superficie', 'antiguedad', 'dormitorios', 'banos', 'planta']
-                columnas_opcionales = ['calefaccion', 'ascensor', 'vivienda_nueva', 'calidad_alta']
-                
-                faltan_requeridas = [col for col in columnas_requeridas if col not in df.columns]
-                if faltan_requeridas:
-                    st.error(f"❌ Faltan columnas requeridas: {', '.join(faltan_requeridas)}")
+                # Validar que existe columna modelo
+                if 'modelo' not in df.columns:
+                    st.error("❌ El archivo debe contener la columna 'modelo' que especifique el tipo de modelo para cada fila")
                     return
                 
                 print(f"✅ Archivo cargado correctamente - {len(df)} registros detectados")
@@ -969,152 +1137,286 @@ def pagina_tasacion_multiple():
                 with col_stats1:
                     st.metric("Registros", len(df))
                 with col_stats2:
-                    st.metric("Municipios", df['codigo_municipio'].nunique())
+                    modelos_unicos = df['modelo'].unique() if 'modelo' in df.columns else []
+                    st.metric("Tipos de modelo", len(modelos_unicos))
                 with col_stats3:
-                    st.metric("Tasaciones estimadas", f"{len(df)*3}s")
+                    st.metric("Municipios", df['codigo_municipio'].nunique() if 'codigo_municipio' in df.columns else 0)
                 
                 # Vista previa
                 st.subheader("👁️ Vista previa de datos")
-                st.dataframe(df.head(10), width=True, height=300)
+                st.dataframe(df.head(10), use_container_width=True, height=300)
                 
                 # Procesar lote
-                if st.button("🚀 Procesar Lote Completo", type="primary", width=True):
+                if st.button("🚀 Procesar Lote Completo", type="primary", use_container_width=True):
                     with st.spinner(f"Procesando {len(df)} registros con modelos econométricos..."):
-                        resultados = []
-                        errores = []
+                        resultados_exitosos = []
+                        resultados_detallados = []
+                        errores_detallados = []
                         
                         for idx, fila in df.iterrows():
-                            try:
-                                # Validar datos de la fila
-                                if pd.isna(fila['codigo_municipio']) or pd.isna(fila['superficie']):
-                                    errores.append(f"Fila {idx+2}: Datos requeridos faltantes")
-                                    continue
-                                
-                                codigo_municipio = str(fila['codigo_municipio'])
-                                
-                                # Obtener modelo directamente
-                                modelo_nombre = str(fila['modelo'])
-                                modelo_valor = st.session_state.modelo.obtener_modelo(modelo_nombre)
-                                
-                                if not modelo_valor:
-                                    errores.append(f"Fila {idx+2}: Modelo {modelo_nombre} no encontrado")
-                                    continue
-                                
-                                # Preparar datos
-                                datos = {
-                                    'superficie': float(fila['superficie']),
-                                    'antiguedad': float(fila.get('antiguedad', 0)),
-                                    'dormitorios': int(fila.get('dormitorios', 0)),
-                                    'banos': int(fila.get('banos', 0)),
-                                    'planta': int(fila.get('planta', 0)),
-                                    'calefaccion': bool(fila.get('calefaccion', False)),
-                                    'ascensor': bool(fila.get('ascensor', False)),
-                                    'vivienda_nueva': bool(fila.get('vivienda_nueva', False)),
-                                    'calidad_alta': bool(fila.get('calidad_alta', False)),
-                                    'estado_alto': False  # Por defecto
-                                }
-                                
-                                # Calcular valores
-                                valor_m2, contrib_valor = st.session_state.modelo.calcular_valor_m2(
-                                    datos, modelo_valor, codigo_municipio
-                                )
-                                valor_total = valor_m2 * datos['superficie']
-                                if modelo_nombre == 'testigos_tasa':
-                                    tasa_descuento, contrib_tasa = st.session_state.modelo.calcular_tasa_descuento(datos)
-                                else:
-                                    tasa_descuento = 0.0  # valor por defecto
-                                
-                                # Encontrar factores más influyentes
-                                contrib_abs = {k: abs(v) for k, v in contrib_valor.items() if k != 'valor_base'}
-                                top_factores = sorted(contrib_abs.items(), key=lambda x: x[1], reverse=True)[:2]
-                                factores_influyentes = ", ".join([f[0] for f in top_factores])
-                                
-                                resultados.append({
-                                    'codigo_municipio': codigo_municipio,
-                                    'superficie': datos['superficie'],
-                                    'valor_m2': round(valor_m2, 2),
-                                    'valor_total': round(valor_total, 2),
-                                    'tasa_descuento': round(tasa_descuento, 4),
-                                    'modelo': modelo_valor['nombre_modelo'],
-                                    'factores_influyentes': factores_influyentes
-                                })
-                                
-                            except Exception as e:
-                                errores.append(f"Fila {idx+2}: Error en cálculo - {str(e)}")
-                        
-                        # Mostrar resultados
-                        if resultados:
-                            st.success(f"✅ Procesamiento completado - {len(resultados)} tasaciones generadas")
+                            numero_fila = idx + 2  # +2 porque Excel empieza en 1 y tiene headers
                             
-                            # Crear DataFrame de resultados
-                            df_resultados = pd.DataFrame(resultados)
-                            
-                            # Mostrar resumen
-                            col_res1, col_res2, col_res3 = st.columns(3)
-                            with col_res1:
-                                st.metric("Valor medio m²", f"€ {df_resultados['valor_m2'].mean():,.0f}")
-                            with col_res2:
-                                st.metric("Tasa media", f"{df_resultados['tasa_descuento'].mean():.2%}")
-                            with col_res3:
-                                st.metric("Éxito", f"{len(resultados)}/{len(df)}")
-                            
-                            # Mostrar resultados detallados
-                            st.subheader("📋 Resultados Detallados")
-                            st.dataframe(df_resultados, width=True)
-                            
-                            # Botón de descarga
-                            csv = df_resultados.to_csv(index=False)
-                            st.download_button(
-                                "📥 Descargar Resultados CSV",
-                                data=csv,
-                                file_name=f"resultados_tasacion_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                                mime="text/csv",
-                                width=True
+                            # Procesar fila individual
+                            es_exitosa, resultado, mensaje_error = procesar_fila_multiple(
+                                fila, st.session_state.modelo, st.session_state.modelos_json
                             )
+                            
+                            if es_exitosa:
+                                resultados_exitosos.append(resultado)
+                                resultados_detallados.append({
+                                    'fila': numero_fila,
+                                    'estado': '✅ ÉXITO',
+                                    'modelo': resultado['modelo'],
+                                    'codigo_municipio': resultado['codigo_municipio'],
+                                    'superficie': resultado['superficie'],
+                                    'resultado': format_resultado_multiple(resultado),
+                                    'detalles': obtener_detalles_contribuciones(resultado)
+                                })
+                            else:
+                                errores_detallados.append({
+                                    'fila': numero_fila,
+                                    'estado': '❌ ERROR',
+                                    'modelo': str(fila.get('modelo', 'No especificado')),
+                                    'codigo_municipio': str(fila.get('codigo_municipio', 'N/A')),
+                                    'error': mensaje_error
+                                })
                         
-                        if errores:
-                            st.warning(f"⚠️ Se encontraron {len(errores)} errores:")
-                            for error in errores[:10]:  # Mostrar solo primeros 10 errores
-                                st.write(f"• {error}")
-                            if len(errores) > 10:
-                                st.write(f"... y {len(errores) - 10} errores más")
+                        # MOSTRAR RESULTADOS DEL PROCESAMIENTO
+                        st.subheader("📊 Resultados del Procesamiento")
+                        
+                        col_res1, col_res2, col_res3 = st.columns(3)
+                        with col_res1:
+                            st.metric("Procesadas correctamente", len(resultados_exitosos))
+                        with col_res2:
+                            st.metric("Errores", len(errores_detallados))
+                        with col_res3:
+                            tasa_exito = (len(resultados_exitosos) / len(df)) * 100 if len(df) > 0 else 0
+                            st.metric("Tasa de éxito", f"{tasa_exito:.1f}%")
+                        
+                        # Pestañas para resultados detallados
+                        tab_resultados, tab_errores, tab_consolidado = st.tabs([
+                            f"✅ Resultados ({len(resultados_exitosos)})",
+                            f"❌ Errores ({len(errores_detallados)})", 
+                            "📋 Consolidado"
+                        ])
+                        
+                        with tab_resultados:
+                            if resultados_detallados:
+                                df_resultados = pd.DataFrame(resultados_detallados)
+                                st.dataframe(df_resultados, use_container_width=True)
+                            else:
+                                st.info("No hay resultados exitosos para mostrar")
+                        
+                        with tab_errores:
+                            if errores_detallados:
+                                df_errores = pd.DataFrame(errores_detallados)
+                                st.dataframe(df_errores, use_container_width=True)
                                 
+                                # Mostrar análisis de errores
+                                st.subheader("📈 Análisis de Errores")
+                                errores_por_tipo = df_errores['error'].value_counts()
+                                st.bar_chart(errores_por_tipo)
+                            else:
+                                st.success("🎉 No se encontraron errores en el procesamiento")
+                        
+                        with tab_consolidado:
+                            st.markdown("""
+                                **📊 Estructura del Excel generado:**
+                                
+                                - **Columnas básicas**: Modelo, código municipio, superficie
+                                - **Resultados**: Valor m², valor total, tasa descuento o prima riesgo (según modelo)
+                                - **Factores influyentes**: Los 2 factores que más impactan en el resultado con su porcentaje
+                                
+                                *Cada fila representa una tasación procesada correctamente*
+                                """)
+                            if resultados_exitosos:
+                                # Crear DataFrame consolidado para descarga MEJORADO
+                                datos_consolidados = []
+                                for resultado in resultados_exitosos:
+                                    fila_consolidada = {
+                                        'modelo': resultado['modelo'],
+                                        'codigo_municipio': resultado['codigo_municipio'],
+                                        'superficie': resultado['superficie']
+                                    }
+                                    
+                                    # Resultados específicos por tipo
+                                    if resultado['tipo'] == 'valor':
+                                        fila_consolidada.update({
+                                            'valor_m2': round(resultado['valor_m2'], 2),
+                                            'valor_total': round(resultado['valor_total'], 2),
+                                            'tasa_descuento': '',
+                                            'prima_riesgo': ''
+                                        })
+                                    elif resultado['tipo'] == 'tasa':
+                                        fila_consolidada.update({
+                                            'valor_m2': '',
+                                            'valor_total': '',
+                                            'tasa_descuento': round(resultado['valor'], 4),
+                                            'prima_riesgo': ''
+                                        })
+                                    elif resultado['tipo'] == 'prima':
+                                        fila_consolidada.update({
+                                            'valor_m2': '',
+                                            'valor_total': '',
+                                            'tasa_descuento': '',
+                                            'prima_riesgo': round(resultado['valor'], 4)
+                                        })
+                                    
+                                    # Agregar factores más influyentes como columnas separadas
+                                    factores = obtener_factores_influyentes_detallados(resultado['contribuciones'])
+                                    fila_consolidada.update(factores)
+                                    
+                                    datos_consolidados.append(fila_consolidada)
+                                
+                                df_consolidado = pd.DataFrame(datos_consolidados)
+                                
+                                # Reordenar columnas para mejor presentación
+                                column_order = ['modelo', 'codigo_municipio', 'superficie', 'valor_m2', 'valor_total', 
+                                            'tasa_descuento', 'prima_riesgo', 'factor_1', 'impacto_1', 'factor_2', 'impacto_2']
+                                # Solo incluir columnas que existan en el DataFrame
+                                column_order = [col for col in column_order if col in df_consolidado.columns]
+                                df_consolidado = df_consolidado[column_order]
+                                
+                                st.dataframe(df_consolidado, use_container_width=True)
+                                
+                                # Descargar como Excel
+                                output = io.BytesIO()
+                                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                                    df_consolidado.to_excel(writer, index=False, sheet_name='Resultados_Tasacion')
+                                
+                                excel_data = output.getvalue()
+                                st.download_button(
+                                    "📊 Descargar Excel con Resultados",
+                                    data=excel_data,
+                                    file_name=f"resultados_tasacion_consolidado_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    use_container_width=True
+                                )
+                            else:
+                                st.info("No hay datos consolidados para mostrar")
+
             except Exception as e:
                 st.error(f"❌ Error procesando el archivo: {str(e)}")
     
     with col2:
         st.subheader("📋 Plantilla de Ejemplo")
         
-        # Crear plantilla con datos de ejemplo usando códigos
-        sample_data = {
-            'modelo': ['testigos_menos_10000', 'testigos_menos_10000', 'testigos_menos_10000', 'testigos_menos_10000', 'testigos_menos_10000'],
-            'codigo_municipio': ['2005', '2006', '2007', '2008', '2010'],
-            'superficie': [85.5, 120.0, 65.0, 95.0, 110.0],
-            'dormitorios': [3, 4, 2, 3, 4],
-            'banos': [2, 3, 1, 2, 2],
-            'planta': [2, 3, 1, 0, 2],
-            'calefaccion': [True, True, False, True, True],
-            'ascensor': [True, True, False, False, True],
-            'vivienda_nueva': [False, True, False, True, False],
-            'rehabilitacion': [False, False, True, False, True],
-            'calidad_alta': [False, True, False, False, True]
-        }
-        sample_df = pd.DataFrame(sample_data)
+        # Cargar plantilla existente desde assets
+        plantilla_path = "assets/plantilla_tasacion_basica.xlsx"
         
-        st.download_button(
-            "📥 Descargar plantilla",
-            data=sample_df.to_csv(index=False),
-            file_name="plantilla_tasacion_multiple.csv",
-            mime="text/csv",
-            help="Descargue esta plantilla como referencia para el formato requerido"
-        )
+        # Buscar la plantilla en diferentes ubicaciones posibles
+        posibles_rutas = [
+            plantilla_path,
+            f"/app/{plantilla_path}",
+            f"/app/assets/plantilla_tasacion_basica.xlsx",
+            "./assets/plantilla_tasacion_basica.xlsx",
+            "plantilla_tasacion_basica.xlsx"
+        ]
+        
+        plantilla_encontrada = None
+        for ruta in posibles_rutas:
+            if os.path.exists(ruta):
+                plantilla_encontrada = ruta
+                break
+        
+        if plantilla_encontrada:
+            try:
+                # Leer el archivo Excel existente
+                with open(plantilla_encontrada, "rb") as file:
+                    excel_data = file.read()
+                
+                # Botón para descargar plantilla
+                st.download_button(
+                    "📥 Descargar plantilla básica",
+                    data=excel_data,
+                    file_name="plantilla_tasacion_basica.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    help="Descargue la plantilla básica con el formato requerido",
+                    use_container_width=True
+                )
+                
+                # Mostrar vista previa de la plantilla
+                with st.expander("👀 Ver estructura de la plantilla"):
+                    try:
+                        df_plantilla = pd.read_excel(plantilla_encontrada)
+                        st.dataframe(df_plantilla.head(5), use_container_width=True)
+                        st.caption(f"Plantilla con {len(df_plantilla)} filas de ejemplo y {len(df_plantilla.columns)} columnas")
+                    except Exception as e:
+                        st.warning(f"No se pudo mostrar vista previa: {e}")
+                        
+            except Exception as e:
+                st.error(f"❌ Error cargando plantilla: {e}")
+                # Fallback: crear plantilla básica
+                st.warning("Usando plantilla básica de respaldo...")
+                crear_plantilla_fallback()
+        else:
+            st.error("❌ No se encontró la plantilla en assets/")
+            st.info("Creando plantilla de respaldo...")
+            crear_plantilla_fallback()
 
         st.markdown("---")
-        st.markdown("### 💡 Consejos")
-        st.write("• Use códigos de municipio válidos")
-        st.write("• Verifique que los valores numéricos sean positivos")
-        st.write("• Las columnas booleanas pueden usar Sí/No o 1/0")
-        st.write("• El procesamiento tarda ~3 segundos por registro")
+        st.markdown("### 💡 Consejos para el formato")
+        st.write("• **Columna 'modelo'**: Debe coincidir exactamente con los nombres de modelo")
+        st.write("• **Validación automática**: Cada fila se valida según su tipo de modelo")
+        st.write("• **Formato Excel**: Use el formato .xlsx para mejor compatibilidad")
+        st.write("• **Codificación**: UTF-8 para caracteres especiales")
+
+def obtener_factores_influyentes_detallados(contribuciones: Dict) -> Dict:
+    """Obtiene los factores más influyentes como columnas separadas"""
+    factores_dict = {}
+    
+    if contribuciones:
+        # Excluir el valor base y ordenar por valor absoluto
+        contribs_filtradas = {k: v for k, v in contribuciones.items() 
+                             if 'base' not in k.lower() and 'municipio' not in k.lower()}
+        
+        if contribs_filtradas:
+            # Ordenar por impacto absoluto y tomar top 2
+            top_factores = sorted(contribs_filtradas.items(), 
+                                key=lambda x: abs(x[1]), reverse=True)[:2]
+            
+            # Asignar a columnas separadas
+            for i, (factor, impacto) in enumerate(top_factores, 1):
+                # Limpiar nombre del factor
+                nombre_limpio = factor.replace('contrib_', '').replace('_', ' ').title()
+                factores_dict[f'factor_{i}'] = nombre_limpio
+                factores_dict[f'impacto_{i}'] = f"{impacto:+.1f}%"
+        
+        # Rellenar con vacíos si hay menos de 2 factores
+        for i in range(len(top_factores) + 1, 3):
+            factores_dict[f'factor_{i}'] = ''
+            factores_dict[f'impacto_{i}'] = ''
+    
+    return factores_dict
+
+# Funciones auxiliares para el procesamiento múltiple
+def format_resultado_multiple(resultado: Dict) -> str:
+    """Formatea el resultado para mostrar en tabla"""
+    if resultado['tipo'] == 'valor':
+        return f"€{resultado['valor_m2']:,.0f}/m² (Total: €{resultado['valor_total']:,.0f})"
+    elif resultado['tipo'] == 'tasa':
+        return f"{resultado['valor']:.2%}"
+    elif resultado['tipo'] == 'prima':
+        return f"{resultado['valor']:.2%}"
+    return "N/A"
+
+def obtener_detalles_contribuciones(resultado: Dict) -> str:
+    """Obtiene los detalles de contribuciones para mostrar"""
+    if 'contribuciones' in resultado:
+        contribs = resultado['contribuciones']
+        top_3 = sorted(contribs.items(), key=lambda x: abs(x[1]), reverse=True)[:3]
+        return ", ".join([f"{k}: {v:+.1f}%" for k, v in top_3])
+    return "Sin detalles"
+
+def obtener_factores_influyentes(contribuciones: Dict) -> str:
+    """Obtiene los factores más influyentes para el resultado consolidado"""
+    if contribuciones:
+        # Excluir el valor base y ordenar por valor absoluto
+        contribs_filtradas = {k: v for k, v in contribuciones.items() if 'base' not in k.lower()}
+        if contribs_filtradas:
+            top_2 = sorted(contribs_filtradas.items(), key=lambda x: abs(x[1]), reverse=True)[:2]
+            return " + ".join([k for k, v in top_2])
+    return "Municipio"
 
 def pagina_documentacion():
     """Pestaña de documentación técnica mejorada usando configuración YAML"""

@@ -11,7 +11,7 @@ sistema:
 metricas:
   r2_promedio: "69.83%"
   precision: "97.2%"
-  tiempo_procesamiento: "3 segundos por registro"
+  tiempo_procesamiento: "0.3 segundos por registro"
   limite_registros: 500
 
 modelos_disponibles:
@@ -46,7 +46,7 @@ modelos_disponibles:
 documentacion:
   introduccion: |
     Sistema de valoración basado en análisis de regresión múltiple sobre una base de datos de 
-    **205,000+ observaciones** (testigos y viviendas tasadas). Desarrollado según 
+    205,000+ observaciones (testigos y viviendas tasadas). Desarrollado según 
     la normativa ECO 805 con validación estadística robusta.
     
   metodologia:
