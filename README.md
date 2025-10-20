@@ -38,69 +38,24 @@ Coefficients come from regression analysis on 205000+ observations and represent
 ### Con Docker Compose (Recomendado)
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
 La aplicación estará disponible en: `http://localhost:8501`
 
 ### Configuración
 
-Los modelos y coeficientes se configuran en config/modelos.yaml.
+Los modelos y coeficientes se configuran en los ficheros `config/modelo_*.yaml`.
 
-
-## Estructura del Proyecto
-src/app.py: Aplicación principal Streamlit
-
-src/models/: Modelos de datos y validadores Pydantic
-
-src/utils/: Utilidades para cálculos
-
-config/modelos.yaml: Configuración de modelos y coeficientes
+La información mostrada sobre la aplicación se configura en `config/info.yaml`.
 
 ## Desarrollo
 
 Para el desarrollador, instale las dependencias y ejecute el proyecto con streamlit:
 
+```bash
 pip install -r requirements.txt
 streamlit run src/app.py
-
-
-Ejemplo de configutración de modelos: config/modelos.yaml
-
-```yaml
-version: "1.0"
-fecha_actualizacion: "2025-01-10"
-
-modelos:
-  testigos_rango_1:
-    nombre: "Municipios pequeños (< 5,000 hab)"
-    rango_poblacion: [0, 5000]
-    coeficientes:
-      intercepto: 1000.0
-      superficie: 150.5
-      antiguedad: -10.2
-      habitaciones: 25.3
-      banyos: 30.1
-      # ... más coeficientes según el Excel
-    variables:
-      - nombre: "superficie"
-        tipo: "float"
-        descripcion: "Superficie útil en m²"
-        rango: [0, 1000]
-      
-      - nombre: "antiguedad" 
-        tipo: "int"
-        descripcion: "Años de antigüedad"
-        rango: [0, 200]
-      
-      - nombre: "habitaciones"
-        tipo: "int"
-        descripcion: "Número de habitaciones"
-        rango: [0, 20]
-
-  testigos_rango_2:
-    nombre: "Municipios medianos (5,000 - 20,000 hab)"
-    # ... estructura similar
 ```
 
 # Troubleshooting:
@@ -122,7 +77,4 @@ sudo netstat -tulpn | grep 8501
 - Añadir una Root MSE promedio además de la precisión al lateral de información?
 - Arreglar lo de ocultar lo de Deploy y header de streamlit excepto el botón de desplegar sidebar de nuevo.
 - Añadir una Política de privacidad y Términos de uso
-
-- DUDA: El usuario solo debería escoger entre los modelos de testigos en función de la población? Es decir, podría escoger también el modelo de prima o el de tasa? O estos dos último SIEMPRE se deberían calcular junto con el escogido de los testigos por población?
-- DUDA: Revisar qué rangos razonables de tasa y prima de los valores (clamp) poner, si es que se requieren poner.
-- DUDA: Limitación actual: ¿Cómo vamos a calcular la tasa de descuento para un CODIGOINTEGRADO que no está en el modelo? => Ahora mismo NO PODEMOS; ellos tendrían que buscar una solución adecuada (e.g. diferenciar modelos  de segmentar por nº habitantes también).
+- Revisar qué rangos razonables de tasa y prima de los valores (clamp) poner, si es que se requieren poner.
