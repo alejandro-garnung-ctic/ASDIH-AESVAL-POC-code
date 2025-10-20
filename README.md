@@ -51,6 +51,7 @@ Sistema web para cálculo de **Tasa de Descuento** y **Prima de Riesgo** de inmu
 ## Instalación y Despliegue
 
 ### Con Docker Compose (Recomendado)
+
 ```bash
 docker compose up -d --build
 ```
@@ -63,6 +64,7 @@ docker-compose logs -f tasacion-app
 ```
 
 ### Desarrollo Local
+
 ```bash
 pip install -r requirements.txt
 streamlit run src/app.py

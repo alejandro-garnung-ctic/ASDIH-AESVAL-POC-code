@@ -6,6 +6,8 @@ Script de inicio multiplataforma para AESVAL Tasación App
 import os
 import sys
 import platform
+import subprocess
+import time
 
 def main():
     print("🚀 Iniciando aplicación de tasación AESVAL...")
@@ -35,8 +37,12 @@ def main():
     print("🛑 Para detener: docker-compose down")
     print("==========================================")
     
-    # Ejecutar Streamlit
-    os.execvp("streamlit", [
+    # Forzar el flush de la salida
+    sys.stdout.flush()
+    time.sleep(1) # Pequeña pausa para asegurarse de que se muestren los mensajes
+    
+    # Ejecutar Streamlit como subprocess para mantener el control
+    subprocess.run([
         "streamlit", "run", "src/app.py",
         "--server.port=8502",
         "--server.address=0.0.0.0", 
