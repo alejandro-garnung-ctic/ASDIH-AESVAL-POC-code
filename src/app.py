@@ -1431,7 +1431,7 @@ def pagina_documentacion():
     st.subheader("🧮 Modelos Matemáticos Implementados")
     
     tab_model1, tab_model2, tab_model3 = st.tabs(["Valor por m²", "Tasa Descuento", "Prima Riesgo"])
-    
+        
     with tab_model1:
         st.markdown("""
         ### Modelo de Valor por Metro Cuadrado
@@ -1440,19 +1440,23 @@ def pagina_documentacion():
         
         **Donde:**
         - $VM_{i}$: Valor por m² del inmueble i
-        - $\\beta_0$: Término independiente (valor base municipal)
+        - $\\beta_0$: Término independiente (valor base municipal) - **_cons**
         - $\\beta_j$: Coeficientes de las variables explicativas
         - $X_{ji}$: Variables intrínsecas del inmueble
         - $\\epsilon_i$: Término de error
         
         **Variables Significativas:**
-        - Superficie (efecto variable según municipio)
-        - Antigüedad (depreciación)
-        - Número de baños (positivo)
-        - Número de dormitorios (negativo en municipios grandes)
-        - Calefacción, ascensor, calidad constructiva
+        - **SU**: Superficie construida (efecto variable según municipio)
+        - **Dnueva**: Vivienda nueva (< 5 años) - dummy
+        - **DCA**: Calefacción - dummy  
+        - **ND**: Número de dormitorios (negativo en municipios grandes)
+        - **NB**: Número de baños (positivo)
+        - **CC_Alta**: Calidad constructiva alta - dummy
+        - **DAS**: Ascensor - dummy
+        - **PLbis**: Planta del inmueble (efecto positivo)
+        - **_cons**: Término constante (valor base)
         """)
-    
+
     with tab_model2:
         st.markdown("""
         ### Modelo de Tasa de Descuento
@@ -1464,17 +1468,22 @@ def pagina_documentacion():
         - Prima de riesgo específica del inmueble
         
         **Variables Significativas:**
-        - Superficie: efecto positivo marginal
-        - Antigüedad: efecto positivo (mayor riesgo)
-        - Baños: efecto negativo (reduce riesgo)
-        - Ascensor: efecto negativo (reduce riesgo)
-        - Estado conservación alto: efecto negativo
+        - **SU**: Superficie construida (efecto positivo marginal)
+        - **antig**: Antigüedad del inmueble (efecto positivo - mayor riesgo)
+        - **Dnueva**: Vivienda nueva (< 5 años) - dummy
+        - **NB**: Número de baños (efecto negativo - reduce riesgo)
+        - **ND**: Número de dormitorios
+        - **DAS**: Ascensor (efecto negativo - reduce riesgo)
+        - **EC_Alto**: Estado de conservación alto (efecto negativo - reduce riesgo)
+        - **rehab**: Rehabilitación del edificio - dummy
+        - **CC_Alta**: Calidad constructiva alta - dummy
+        - **_cons**: Término constante (tasa base)
         """)
         
         st.latex(r"""
         \text{Tasa Descuento} = \text{Tasa Libre Riesgo} + \text{Prima Riesgo}
         """)
-    
+
     with tab_model3:
         st.markdown("""
         ### Modelo de Prima de Riesgo
@@ -1487,13 +1496,25 @@ def pagina_documentacion():
         - Riesgo por características constructivas
         - Riesgo de mercado local
         
+        **Variables Significativas:**
+        - **SU**: Superficie construida
+        - **antig**: Antigüedad del inmueble (aumenta prima consistentemente)
+        - **Dnueva**: Vivienda nueva (< 5 años) - dummy
+        - **NB**: Número de baños
+        - **ND**: Número de dormitorios
+        - **DAS**: Ascensor (reduce prima)
+        - **EC_Alto**: Estado de conservación alto (reduce prima)
+        - **rehab**: Rehabilitación del edificio - dummy
+        - **CC_Alta**: Calidad constructiva alta - dummy (efecto variable)
+        - **_cons**: Término constante (prima base)
+        
         **Hallazgos Clave:**
         - Municipios pequeños: mayor prima por iliquidez
         - Antigüedad: aumenta prima consistentemente
         - Ascensor y buen estado: reducen prima
         - Calidad constructiva: efecto variable
         """)
-    
+
     # Segmentación por población - CORRECCIÓN: Leer R² desde modelos_disponibles
     st.subheader("🏙️ Segmentación por Tamaño Municipal")
     
@@ -1520,7 +1541,7 @@ def pagina_documentacion():
     st.markdown("""
     **Hallazgos clave de los modelos econométricos:**
     - **R² decreciente con tamaño municipal**: Mayor poder explicativo en municipios pequeños (76.32%) vs grandes (61.95%)
-    - **Efecto superficie (SU)**: Negativo en municipios <200k hab, positivo en grandes ciudades
+    - **Efecto superficie (SU)**: Negativo en municipios < 200k hab, positivo en grandes ciudades
     - **Dormitorios (ND)**: Efecto negativo consistente en todos los modelos
     - **Variables positivas**: Baños (NB), ascensor (DAS), calidad alta (CC_Alta) y calefacción (DCA) siempre positivas
     - **Planta (PLbis)**: Efecto positivo que se intensifica con el tamaño municipal
@@ -1563,19 +1584,19 @@ def main():
     mostrar_sidebar()
     
     tab1, tab2, tab3 = st.tabs([
+        "📚 Documentación Técnica", 
         "🏠 Tasación Individual", 
-        "📁 Tasación por Lotes", 
-        "📚 Documentación Técnica"
+        "📁 Tasación por Lotes"
     ])
     
     with tab1:
-        pagina_tasacion_individual()
+        pagina_documentacion()
     
     with tab2:
-        pagina_tasacion_multiple()
+        pagina_tasacion_individual()
     
     with tab3:
-        pagina_documentacion()
+        pagina_tasacion_multiple()
     
     mostrar_footer()
 
