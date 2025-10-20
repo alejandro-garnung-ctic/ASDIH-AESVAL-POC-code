@@ -1,74 +1,83 @@
-# ASDIH-AESVAL-POC-code
-A test web for AESVAL ASDIH
+# ASDIH-AESVAL - Sistema de Tasación Automático
 
-Sistema de tasación de inmuebles
+Sistema web para cálculo de **Tasa de Descuento** y **Prima de Riesgo** de inmuebles según normativa ECO 805, basado en modelos econométricos desarrollados con análisis de regresión múltiple.
 
-Aplicación web para el cálculo de tasas de descuento de inmuebles según normativa ECO 805.
+## Características Principales
 
-## Uso
+### 🎯 Funcionalidades
+- **Cálculo Individual**: Tasación en tiempo real para un único inmueble
+- **Procesamiento por Lotes**: Cálculo masivo mediante archivos Excel
+- **Modelos Especializados**: 
+  - Modelo de Tasa Descuento
+  - Modelo de Prima de Riesgo
+- **Análisis Detallado**: Desglose de contribuciones por variable
+- **Validación Robusta**: Verificación automática de datos y formatos
 
-Tasación Individual: Complete el formulario con las características del inmueble, pulse el botón de calcular y vea el resultado de la tasación
+### 📊 Modelos Implementados
+- **Tasa de Descuento**: Cálculo de la tasa aplicable considerando riesgo específico del inmueble
+- **Prima de Riesgo**: Evaluación del riesgo adicional por características particulares
+- **Base de datos**: Modelos entrenados con 205,000+ observaciones reales
 
-Tasación Múltiple: Suba un archivo Excel con múltiples registros, pulse calcular, descargue el resultado y vea las tasaciones
+## Uso de la Aplicación
 
-Documentación: Consulte la explicación del modelo matemático
+### Tasación Individual
+1. Seleccione el modelo (Tasa Descuento o Prima Riesgo)
+2. Complete las características del inmueble
+3. Haga clic en "Calcular"
+4. Revise resultados y análisis de contribuciones
 
-## Modalidades
+### Tasación Múltiple
+1. Descargue la plantilla Excel disponible
+2. Complete los datos de múltiples inmuebles
+3. Suba el archivo y procese el lote
+4. Descargue resultados consolidados
 
-- Modalidad 1: **Tasación Individual**: Cálculo de tasa para un único inmueble
-- Modalidad 2: **Tasación Múltiple**: Procesamiento por lotes mediante archivos Excel
+## Variables del Modelo
 
-## Features:
+### Variables Comunes a Todos los Modelos
+- **SU**: Superficie construida (m²)
+- **ND**: Número de dormitorios  
+- **NB**: Número de baños
+- **PLbis**: Planta del inmueble
+- **DAS**: Ascensor (booleano)
+- **CC_Alta**: Calidad constructiva alta (booleano)
+- **Dnueva**: Vivienda nueva <5 años (booleano)
 
-- **Análisis de Contribuciones**: Identificación de variables más influyentes
-- **Validación de Datos**: Verificación de formatos y completitud
+### Variables Específicas Tasa/Prima
+- **antig**: Antigüedad del inmueble (años)
+- **EC_Alto**: Estado de conservación alto (booleano)
+- **rehab**: Rehabilitación del edificio (booleano)
 
-### Variable Contribution Calculation
-
-Each variable contributes to the final result by multiplying its **value** by its **coefficient** from the econometric model. The impact is shown as a percentage of the total calculated value:
-
-- **Surface area**: `80 m² × -4.145 €/m² = -331.6 €` → `-2.2% 📉 Reduces value`
-- **Additional bathroom**: `1 bathroom × 90.862 € = +90.86 €` → `+3.0% 📈 Increases value`  
-- **Elevator**: `Yes × 116.861 € = +116.86 €` → `+16.0% 📈 Increases value`
-
-Coefficients come from regression analysis on 205000+ observations and represent the marginal impact of each characteristic. The percentage shows each variable's relative contribution to the final calculated value/rate.
-
-## Instalación y Ejecución
+## Instalación y Despliegue
 
 ### Con Docker Compose (Recomendado)
-
 ```bash
 docker compose up -d --build
 ```
+La aplicación estará disponible en: `http://localhost:8502`
 
-La aplicación estará disponible en: `http://localhost:8501`
-
-### Configuración
-
-Los modelos y coeficientes se configuran en los ficheros `config/modelo_*.yaml`.
-
-La información mostrada sobre la aplicación se configura en `config/info.yaml`.
-
-## Desarrollo
-
-Para el desarrollador, instale las dependencias y ejecute el proyecto con streamlit:
-
+### Desarrollo Local
 ```bash
 pip install -r requirements.txt
 streamlit run src/app.py
 ```
 
-# Troubleshooting:
+## Configuración
 
-Verificar puertos:
+- **Modelos**: Archivos JSON en `config/modelo_*.json`
+- **Sistema**: Configuración general en `config/info.yaml`
+- **Coeficientes**: Definidos por modelo econométrico en archivos de configuración
 
-```bash
-# Ver qué procesos usan el puerto 8501
-sudo lsof -i :8501
+## Estructura Técnica
 
-# O usar netstat
-sudo netstat -tulpn | grep 8501
-```
+- **Frontend**: Streamlit
+- **Procesamiento**: Pandas, NumPy
+- **Modelos**: Coeficientes pre-calculados desde análisis econométrico
+- **Persistencia**: Session state para datos entre recargas
+
+---
+
+*Sistema desarrollado por AESVAL - CTIC para la tasación automatizada según normativa ECO 805*
 
 # TODO
 
@@ -78,3 +87,4 @@ sudo netstat -tulpn | grep 8501
 - Arreglar lo de ocultar lo de Deploy y header de streamlit excepto el botón de desplegar sidebar de nuevo.
 - Añadir una Política de privacidad y Términos de uso
 - Revisar qué rangos razonables de tasa y prima de los valores (clamp) poner, si es que se requieren poner.
+- Se podría construir un registro/imagen propia y guardarla, para no depender de Docker Hub y la imagen python:3.11-slim cada vez que se recompile.

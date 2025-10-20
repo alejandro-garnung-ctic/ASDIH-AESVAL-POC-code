@@ -7,14 +7,14 @@ echo ""
 # Configurar variables de entorno para Streamlit
 export STREAMLIT_SERVER_HEADLESS=true
 export STREAMLIT_SERVER_ADDRESS=0.0.0.0
-export STREAMLIT_SERVER_PORT=8501
+export STREAMLIT_SERVER_PORT=8502
 export STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 
 echo "⏳ Iniciando Streamlit..."
 echo "✅ APLICACIÓN INICIADA CORRECTAMENTE"
 echo "=========================================="
 echo "🌐 ACCEDA A LA APLICACIÓN EN:"
-echo "   http://127.0.0.1:8501"
+echo "   http://127.0.0.1:8502"
 echo ""
 echo "📊 Características:"
 echo "   • Tasación individual de inmuebles"
@@ -28,7 +28,7 @@ echo "=========================================="
 
 # Ejecutar Streamlit con configuración explícita
 exec streamlit run src/app.py \
-    --server.port=8501 \
+    --server.port=8502 \
     --server.address=0.0.0.0 \
     --server.headless=true \
     --browser.gatherUsageStats=false

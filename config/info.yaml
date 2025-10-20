@@ -1,9 +1,9 @@
-# Configuración del Sistema AESVAL - ECO 805
+# Configuración del Sistema AESVAL
 sistema:
-  nombre: "Sistema de Tasación Automático ECO 805"
-  version: "2.0"
-  actualizacion: "2025-01-10"
-  modelo: "ECO 805 - Análisis Econométrico"
+  nombre: "Sistema de Tasación Automático"
+  version: "1.0"
+  actualizacion: "2025-20-10"
+  modelo: "Análisis Econométrico Regresivo"
   base_datos: "205,000+ testigos"
   desarrollador: "AESVAL - CTIC"
   año: 2025
@@ -11,8 +11,8 @@ sistema:
 metricas:
   r2_promedio: "69.83%"
   precision: "97.2%"
-  tiempo_procesamiento: "0.3 segundos por registro"
-  limite_registros: 500
+  tiempo_procesamiento: "0.1 ms por registro"
+  limite_registros: 50000
 
 modelos_disponibles:
   - clave: "testigos_menos_10000"

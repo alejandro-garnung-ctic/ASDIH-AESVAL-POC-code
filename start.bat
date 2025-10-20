@@ -7,8 +7,8 @@ echo ⏳ Iniciando Streamlit...
 echo ✅ APLICACIÓN INICIADA CORRECTAMENTE
 echo ==========================================
 echo 🌐 ACCEDA A LA APLICACIÓN EN:
-echo    http://localhost:8501
-echo    http://127.0.0.1:8501
+echo    http://localhost:8502
+echo    http://127.0.0.1:8502
 echo.
 echo 📊 Características:
 echo    • Tasación individual de inmuebles
@@ -20,4 +20,4 @@ echo ⚙️  Para ver logs: docker-compose logs -f
 echo 🛑 Para detener: docker-compose down
 echo ==========================================
 
-streamlit run src\app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false
+streamlit run src\app.py --server.port=8502 --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false
