@@ -56,6 +56,12 @@ docker compose up -d --build
 ```
 La aplicación estará disponible en: `http://localhost:8502`
 
+Para ver los logs de la aplicación:
+
+```bash
+docker-compose logs -f tasacion-app
+```
+
 ### Desarrollo Local
 ```bash
 pip install -r requirements.txt

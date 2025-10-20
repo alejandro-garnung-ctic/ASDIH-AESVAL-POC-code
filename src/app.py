@@ -714,7 +714,7 @@ def pagina_tasacion_individual():
             else:
                 texto_boton = "📈 Calcular Tasa Descuento"
             
-            if st.button(texto_boton, type="primary", use_container_width=True):
+            if st.button(texto_boton, type="primary", width='stretch'):
                 with st.spinner("Calculando usando modelos econométricos..."):
                     # Obtener el modelo seleccionado directamente
                     modelo_valor = st.session_state.modelo.obtener_modelo(modelo_seleccionado)
@@ -800,7 +800,7 @@ def pagina_tasacion_individual():
                                 'Impacto en Prima': [f"{v:+.1f}%" for v in resultados['contrib_prima'].values()],  
                                 'Efecto': ['📈 Aumenta' if v > 0 else '📉 Reduce' for v in resultados['contrib_prima'].values()]
                             })
-                            st.dataframe(contrib_df_prima, use_container_width=True, height=200, hide_index=True)
+                            st.dataframe(contrib_df_prima, width='stretch', height=200, hide_index=True)
                         
                         else:
                             st.subheader("📈 Contribución a la Tasa")
@@ -809,7 +809,7 @@ def pagina_tasacion_individual():
                                 'Impacto en Tasa': [f"{v:+.1f}%" for v in resultados['contrib_tasa'].values()],
                                 'Efecto': ['📈 Aumenta' if v > 0 else '📉 Reduce' for v in resultados['contrib_tasa'].values()]
                             })
-                            st.dataframe(contrib_df_tasa, use_container_width=True, height=200, hide_index=True)
+                            st.dataframe(contrib_df_tasa, width='stretch', height=200, hide_index=True)
                     
                     # Preparar resultado para descarga
                     resultado_descarga = {
@@ -836,7 +836,7 @@ def pagina_tasacion_individual():
                         data=json.dumps(resultado_descarga, indent=2, ensure_ascii=False),
                         file_name=f"calculo_{codigo_municipio}_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
                         mime="application/json",
-                        use_container_width=True
+                        width='stretch'
                     )
             else:
                 st.info("ℹ️ Complete los datos y haga clic en el botón para obtener resultados")
@@ -966,7 +966,7 @@ def crear_plantilla_fallback(modelo_tipo: str = "tasa"):
         data=excel_data,
         file_name=nombre_archivo,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
+        width='stretch'
     )
     
 def pagina_tasacion_multiple():
@@ -1030,7 +1030,7 @@ def pagina_tasacion_multiple():
                     st.metric("Municipios", df['codigo_municipio'].nunique() if 'codigo_municipio' in df.columns else 0)
                 
                 # Procesar lote
-                if st.button("🚀 Procesar Lote Completo", type="primary", use_container_width=True):
+                if st.button("🚀 Procesar Lote Completo", type="primary", width='stretch'):
                     with st.spinner(f"Procesando {len(df)} registros..."):
                         resultados_exitosos = []
                         resultados_detallados = []
@@ -1093,7 +1093,7 @@ def pagina_tasacion_multiple():
                         with tab_resultados:
                             if resultados_detallados:
                                 df_resultados = pd.DataFrame(resultados_detallados)
-                                st.dataframe(df_resultados, use_container_width=True)
+                                st.dataframe(df_resultados, width='stretch')
                                 
                                 # BOTÓN DE DESCARGA EN RESULTADOS
                                 if resultados_exitosos:
@@ -1127,7 +1127,7 @@ def pagina_tasacion_multiple():
                                         data=excel_data,
                                         file_name=f"resultados_{modelo_lote}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        use_container_width=True
+                                        width='stretch'
                                     )
                             else:
                                 st.info("No hay resultados exitosos para mostrar")
@@ -1135,7 +1135,7 @@ def pagina_tasacion_multiple():
                         with tab_errores:
                             if errores_detallados:
                                 df_errores = pd.DataFrame(errores_detallados)
-                                st.dataframe(df_errores, use_container_width=True)
+                                st.dataframe(df_errores, width='stretch')
                                 
                                 # COMENTAR Mostrar análisis de errores
                                 # st.subheader("📈 Análisis de Errores")
@@ -1182,7 +1182,7 @@ def pagina_tasacion_multiple():
                     file_name=f"plantilla_{tipo_modelo}_basica.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     help=f"Descargue la plantilla para cálculo de {tipo_modelo}",
-                    use_container_width=True
+                    width='stretch'
                 )
                 
             except Exception as e:
