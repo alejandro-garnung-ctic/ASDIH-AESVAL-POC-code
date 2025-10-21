@@ -506,9 +506,9 @@ def mostrar_sidebar():
         **Actualización:** {sistema.get('actualizacion', '2025-01-10')}\n
         **Modelo:** {sistema.get('modelo', 'ECO 805 - Análisis Econométrico')}\n
         **Base de datos:** {sistema.get('base_datos', '205,000+ testigos')}\n
-        **R² Promedio:** {metricas.get('r2_promedio', '69.83%')}\n
+        **R² Promedio:** {metricas.get('r2_promedio', '69.83%')}
         """)
-        
+
         st.markdown("---")
         st.markdown("### 📈 Modelos Disponibles")
         
@@ -970,14 +970,16 @@ def pagina_tasacion_multiple():
     """Pestaña para cálculo múltiple por lotes - SOLO TASA Y PRIMA"""
     st.header("📁 Cálculo Múltiple por Lotes")
     
+    limite_registros = f"{st.session_state.config_sistema['metricas'].get('limite_registros', 50000)}"
+
     with st.expander("ℹ️ Información sobre cálculo múltiple", expanded=False):
-        st.markdown("""
+        st.markdown(f"""
         **Características del cálculo por lotes:**
         - Procesamiento simultáneo de múltiples inmuebles
         - Validación automática de datos
         - Detección y reporte de errores por fila
         - Generación de informe consolidado
-        - Límite: 500 registros por lote
+        - Límite: {limite_registros} registros por lote
         
         **Columnas requeridas en el Excel:**
         - `codigo_municipio`: Código del municipio (ej: 2005, 2006, etc.)
