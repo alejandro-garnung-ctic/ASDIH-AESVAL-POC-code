@@ -91,13 +91,3 @@ streamlit run src/app.py
 ---
 
 *Sistema desarrollado por AESVAL - CTIC para la tasación automatizada según normativa ECO 805*
-
-# TODO
-
-- Hacer un comando agnóstico a SO para lanzar el contenedor sea con .sh o .bat
-- Cambiar completamente el enfoque del código para que cómo se calcule el valor, y los parámetros del modelo, no estén en el código. Ello se especificaría directamente en los archivos json o yaml de config (ecuación, parámetros, modelo...), así todo queda configurable incluso en tiempo real, sin necesidad de recompilar para añadir o quitar parámetros o ecuaciones o modelos. Esto resolvería problema de si queremos cambiar e.g. que Los modelos de valor muestran: Dnueva, SU, DCA, ND, NB, CC_Alta, DAS, PLbis y Los modelos de Tasa/Prima muestran: SU, antig, NB, ND, CC_Alta, EC_Alto, rehab, DAS, PLbis
-- Añadir una Root MSE promedio además de la precisión al lateral de información?
-- Arreglar lo de ocultar lo de Deploy y header de streamlit excepto el botón de desplegar sidebar de nuevo.
-- Añadir una Política de privacidad y Términos de uso
-- Revisar qué rangos razonables de tasa y prima de los valores (clamp) poner, si es que se requieren poner.
-- Se podría construir un registro/imagen propia y guardarla, para no depender de Docker Hub y la imagen python:3.11-slim cada vez que se recompile.
