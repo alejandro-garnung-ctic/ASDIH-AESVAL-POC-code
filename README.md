@@ -62,7 +62,7 @@ La aplicación estará disponible en: `http://localhost:8502`
 Para ver los logs de la aplicación:
 
 ```bash
-docker-compose logs -f tasacion-app
+docker compose logs -f tasacion-app
 ```
 
 > [!WARNING]
