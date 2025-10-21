@@ -65,6 +65,9 @@ Para ver los logs de la aplicación:
 docker-compose logs -f tasacion-app
 ```
 
+> [!WARNING]
+> Se recomienda que la aplicación se ejecute en una ruta que no contenga espacios, e.g. `C:\User\Desktop\folder`.
+
 ### Desarrollo Local
 
 ```bash
