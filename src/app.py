@@ -505,12 +505,9 @@ def mostrar_sidebar():
         **Versión:** {sistema.get('version', '1.0')}\n
         **Actualización:** {sistema.get('actualizacion', '2025-01-10')}\n
         **Modelo:** {sistema.get('modelo', 'ECO 805 - Análisis Econométrico')}\n
-        **Base de datos:** {sistema.get('base_datos', '205,000+ testigos')}
+        **Base de datos:** {sistema.get('base_datos', '205,000+ testigos')}\n
+        **R² Promedio:** {metricas.get('r2_promedio', '69.83%')}\n
         """)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("R² Promedio", metricas.get('r2_promedio', '69.83%'))
         
         st.markdown("---")
         st.markdown("### 📈 Modelos Disponibles")
