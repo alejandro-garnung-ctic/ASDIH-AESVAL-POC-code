@@ -14,9 +14,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar código
 COPY src/ ./src/
-COPY config/ ./config/
 COPY assets/ ./assets/
 COPY start.py /app/start.py
+
+# Copiar config y CORREGIR PERMISOS explícitamente
+COPY config/ ./config/
+RUN chmod -R 755 /app/config && \
+    chown -R root:root /app/config && \
+    ls -la /app/config/
 
 # Permisos para el script Linux
 RUN chmod +x /app/start.py

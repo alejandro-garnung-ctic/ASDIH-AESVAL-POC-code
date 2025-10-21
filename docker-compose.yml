@@ -6,8 +6,7 @@ services:
     ports:
       - "8502:8502"
     volumes:
-      - ./config:/app/config:ro
-      - ./data:/app/data:rw
+      - ./config:/app/config:rw
     environment:
       - STREAMLIT_SERVER_HEADLESS=true
       - STREAMLIT_SERVER_ADDRESS=0.0.0.0
@@ -20,6 +19,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-volumes:
-  data:

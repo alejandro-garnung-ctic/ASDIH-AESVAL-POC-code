@@ -53,7 +53,9 @@ Sistema web para cálculo de **Tasa de Descuento** y **Prima de Riesgo** de inmu
 ### Con Docker Compose (Recomendado)
 
 ```bash
-docker compose up -d --build
+docker-compose down
+docker-compose build --no-cache
+docker-compose up
 ```
 La aplicación estará disponible en: `http://localhost:8502`
 
