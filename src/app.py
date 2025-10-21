@@ -48,83 +48,92 @@ st.set_page_config(
 
 def cargar_configuracion_sistema():
     """Carga la configuración del sistema desde archivo YAML"""
-    try:
-        with open('config/info.yaml', 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f)
-    except FileNotFoundError:
-        st.error("❌ No se encontró el archivo de configuración del sistema: config/info.yaml")
-        # Configuración por defecto
-        return {
-            'sistema': {
-                'nombre': 'Sistema de Tasación Automático',
-                'version': '1.0',
-                'actualizacion': '2025-20-10',
-                'modelo': 'Análisis Econométrico Regresivo',
-                'base_datos': '205,000+ testigos',
-                'desarrollador': 'AESVAL - CTIC',
-                'año': 2025
-            },
-            'metricas': {
-                'r2_promedio': '69.83%',
-                'precision': '97.2%',
-                'tiempo_procesamiento': '0.1 ms por registro',
-                'limite_registros': 50000
-            },
-            'modelos_disponibles': [
-                #{'clave': 'testigos_menos_10000', 'nombre': 'Municipios < 10,000 hab'},
-                #{'clave': 'testigos_10000_50000', 'nombre': 'Municipios 10,000-50,000 hab'},
-                #{'clave': 'testigos_50000_200000', 'nombre': 'Municipios 50,000-200,000 hab'},
-                #{'clave': 'testigos_mas_200000', 'nombre': 'Municipios > 200,000 hab'},
-                {'clave': 'testigos_tasa', 'nombre': 'Modelo Tasa Descuento'},
-                {'clave': 'testigos_prima', 'nombre': 'Modelo Prima Riesgo'}
-            ]
-        }
-    except Exception as e:
-        st.error(f"❌ Error cargando configuración del sistema: {e}")
-        return None
+    posibles_rutas = [
+        '/app/config/info.yaml',  # Ruta en contenedor Docker
+        '/app/config/info.yml',   # Alternativa con .yml
+        'config/info.yaml',       # Ruta relativa
+        'config/info.yml',        # Alternativa relativa
+    ]
+    
+    for ruta in posibles_rutas:
+        try:
+            if os.path.exists(ruta):
+                print(f"✅ Cargando configuración desde: {ruta}")
+                with open(ruta, 'r', encoding='utf-8') as f:
+                    return yaml.safe_load(f)
+        except Exception as e:
+            print(f"❌ Error cargando {ruta}: {e}")
+            continue
+    
+    st.error("❌ No se encontró ningún archivo de configuración válido")
+    # Configuración por defecto - SOLO TASA Y PRIMA
+    return {
+        'sistema': {
+            'nombre': 'Sistema de Tasación Automático',
+            'version': '1.0',
+            'actualizacion': '2025-01-10',
+            'modelo': 'Análisis Econométrico Regresivo',
+            'base_datos': '205,000+ testigos',
+            'desarrollador': 'AESVAL - CTIC',
+            'año': 2025
+        },
+        'metricas': {
+            'r2_promedio': '69.83%',
+            'precision': '97.2%',
+            'tiempo_procesamiento': '0.1 ms por registro',
+            'limite_registros': 50000
+        },
+        'modelos_disponibles': [
+            # {'clave': 'testigos_menos_10000', 'nombre': 'Municipios < 10,000 hab'},
+            # {'clave': 'testigos_10000_50000', 'nombre': 'Municipios 10,000-50,000 hab'},
+            # {'clave': 'testigos_50000_200000', 'nombre': 'Municipios 50,000-200,000 hab'},
+            # {'clave': 'testigos_mas_200000', 'nombre': 'Municipios > 200,000 hab'},
+            {'clave': 'testigos_tasa', 'nombre': 'Modelo Tasa Descuento'},
+            {'clave': 'testigos_prima', 'nombre': 'Modelo Prima Riesgo'}
+        ]
+    }
 
 def cargar_modelos_json():
     """Carga los modelos desde archivos JSON en config/"""
     modelos = {}
     
     mapeo_modelos = {
-        #'modelo_Testigos_menos_de_10000': 'testigos_menos_10000',
-        #'modelo_Testigos_10000-50000': 'testigos_10000_50000', 
-        #'modelo_Testigos_50000-200000': 'testigos_50000_200000',
-        #'modelo_Testigos_más_de_200000': 'testigos_mas_200000',
+        # 'modelo_Testigos_menos_de_10000': 'testigos_menos_10000',
+        # 'modelo_Testigos_10000-50000': 'testigos_10000_50000', 
+        # 'modelo_Testigos_50000-200000': 'testigos_50000_200000',
+        # 'modelo_Testigos_más_de_200000': 'testigos_mas_200000',
         'modelo_Testigos_Prima': 'testigos_prima',
         'modelo_Testigos_Tasa': 'testigos_tasa'
     }
     
+    posibles_rutas_base = [
+        '/app/config/',  # Ruta en contenedor
+        'config/',       # Ruta relativa
+        './config/'      # Ruta relativa alternativa
+    ]
+    
     for archivo, clave in mapeo_modelos.items():
-        try:
-            ruta = f"config/{archivo}.json"
-            if os.path.exists(ruta):
-                with open(ruta, 'r', encoding='utf-8') as f:
-                    modelos[clave] = json.load(f)
-                    print(f"✅ Modelo {clave} cargado correctamente")
-            else:
-                # Buscar archivos similares
-                archivos_disponibles = [f for f in os.listdir('config') if f.endswith('.json')]
-                archivo_encontrado = None
-                
-                # Buscar coincidencias aproximadas
-                for archivo_disp in archivos_disponibles:
-                    archivo_sin_ext = archivo_disp.replace('.json', '')
-                    if archivo_sin_ext.lower().replace('_', '-').replace('á', 'a') == archivo.lower().replace('_', '-').replace('á', 'a'):
-                        archivo_encontrado = archivo_disp
-                        break
-                
-                if archivo_encontrado:
-                    ruta_alternativa = f"config/{archivo_encontrado}"
-                    with open(ruta_alternativa, 'r', encoding='utf-8') as f:
+        encontrado = False
+        for ruta_base in posibles_rutas_base:
+            ruta_completa = f"{ruta_base}{archivo}.json"
+            try:
+                if os.path.exists(ruta_completa):
+                    with open(ruta_completa, 'r', encoding='utf-8') as f:
                         modelos[clave] = json.load(f)
-                    st.success(f"✅ Modelo {clave} cargado desde {archivo_encontrado}")
-                else:
-                    st.warning(f"⚠️ No se encontró {ruta} (archivos disponibles: {', '.join(archivos_disponibles)})")
-                    
-        except Exception as e:
-            st.error(f"❌ Error cargando {archivo}: {e}")
+                    print(f"✅ Modelo {clave} cargado desde: {ruta_completa}")
+                    encontrado = True
+                    break
+            except Exception as e:
+                print(f"❌ Error cargando {ruta_completa}: {e}")
+                continue
+        
+        if not encontrado:
+            print(f"⚠️ No se encontró el archivo para modelo {clave}")
+            # Listar archivos disponibles para debugging
+            for ruta_base in posibles_rutas_base:
+                if os.path.exists(ruta_base):
+                    archivos_disponibles = os.listdir(ruta_base)
+                    print(f"📁 Archivos en {ruta_base}: {archivos_disponibles}")
     
     return modelos
 
@@ -178,10 +187,10 @@ class ModeloTasacion:
         
         # Fallback a nombres por defecto - SOLO TASA Y PRIMA
         nombres_legibles = {
-            #'testigos_menos_10000': 'Municipios < 10,000 hab',
-            #'testigos_10000_50000': 'Municipios 10,000-50,000 hab',
-            #'testigos_50000_200000': 'Municipios 50,000-200,000 hab',
-            #'testigos_mas_200000': 'Municipios > 200,000 hab',
+            # 'testigos_menos_10000': 'Municipios < 10,000 hab',
+            # 'testigos_10000_50000': 'Municipios 10,000-50,000 hab',
+            # 'testigos_50000_200000': 'Municipios 50,000-200,000 hab',
+            # 'testigos_mas_200000': 'Municipios > 200,000 hab',
             'testigos_tasa': 'Modelo Tasa Descuento',
             'testigos_prima': 'Modelo Prima Riesgo'
         }
@@ -518,9 +527,10 @@ def mostrar_sidebar():
         # for modelo in modelos_config:
         #     nombre = modelo.get('nombre', modelo.get('clave', ''))
         #     st.write(f"• {nombre}")
-
-        st.write("• Modelo Tasa Descuento")
-        st.write("• Modelo Prima Riesgo")
+        
+        for modelo in modelos_config:
+            nombre = modelo.get('nombre', modelo.get('clave', ''))
+            st.write(f"• {nombre}")
         
         st.markdown("---")
         st.markdown(f"""
@@ -529,7 +539,6 @@ def mostrar_sidebar():
             <p>Sistema de Tasación Automático</p>
         </div>
         """, unsafe_allow_html=True)
-
 def pagina_tasacion_individual():
     """Pestaña para tasación individual - SOLO TASA Y PRIMA"""
     st.header("📊 Cálculo Individual - Tasa y Prima ECO 805")
