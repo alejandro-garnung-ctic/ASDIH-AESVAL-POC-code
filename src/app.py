@@ -13,7 +13,7 @@ current_year = datetime.now().year
 
 # Configuración de página
 st.set_page_config(
-    page_title="AESVAL - Sistema de Tasación Automático",
+    page_title="AESVAL - Modelos de tasa de descuento",
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -472,11 +472,8 @@ def mostrar_header():
         st.markdown("""
         <div style='text-align: center; padding: 1rem 0;'>
             <h2 style='color: #1f77b4; margin-bottom: 0.5rem; font-size: 2.5rem;'>
-                🏠 SISTEMA DE TASACIÓN
+                Modelos de Tasa Descuento y Prima de Riesgo (ECO/805)
             </h2>
-            <h4 style='color: #666; margin-top: 0; font-weight: 300;'>
-                Modelos de Tasa Descuento y Prima de Riesgo ECO 805
-            </h4>
         </div>
         """, unsafe_allow_html=True)
     
@@ -509,7 +506,7 @@ def mostrar_sidebar():
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("### ℹ️ Información del Sistema")
+        st.markdown("### ℹ️ Información del sistema")
         st.info(f"""
         **Versión:** {sistema.get('version', '1.0')}\n
         **Actualización:** {sistema.get('actualizacion', '2025-01-10')}\n
@@ -519,7 +516,7 @@ def mostrar_sidebar():
         """)
 
         st.markdown("---")
-        st.markdown("### 📈 Modelos Disponibles")
+        st.markdown("### 📈 Modelos disponibles")
         
         # Mostrar solo modelos de tasa y prima
 
@@ -536,12 +533,11 @@ def mostrar_sidebar():
         st.markdown(f"""
         <div style='text-align: center; color: #666; font-size: 0.8rem; padding: 1rem 0;'>
             <p>© {sistema.get('año', current_year)} {sistema.get('desarrollador', 'AESVAL - CTIC')}</p>
-            <p>Sistema de Tasación Automático</p>
         </div>
         """, unsafe_allow_html=True)
 def pagina_tasacion_individual():
     """Pestaña para tasación individual - SOLO TASA Y PRIMA"""
-    st.header("📊 Cálculo Individual - Tasa y Prima ECO 805")
+    st.header("Cálculo individual - Tasa y Prima ECO 805")
     
     with st.container():
         st.info("""
@@ -553,7 +549,7 @@ def pagina_tasacion_individual():
     
     with col1:
         with st.container():
-            st.subheader("🏛️ Datos del Inmueble")
+            st.subheader("Datos del inmueble")
             
             col1_1, col1_2 = st.columns(2)
             
@@ -798,9 +794,9 @@ def pagina_tasacion_individual():
                     st.info(f"**Modelo aplicado:** {modelo_valor['nombre_modelo']}")
                     
                     # Contribuciones detalladas (solo las relevantes)
-                    with st.expander("📊 Análisis Detallado de Contribuciones", expanded=True):
+                    with st.expander("📊 Análisis detallado de contribuciones", expanded=True):
                         if es_modelo_prima:
-                            st.subheader("🛡️ Contribución a la Prima")
+                            st.subheader("Contribución a la Prima")
                             contrib_df_prima = pd.DataFrame({
                                 'Variable': list(resultados['contrib_prima'].keys()),
                                 'Impacto en Prima': [f"{v:+.1f}%" for v in resultados['contrib_prima'].values()],  
@@ -809,7 +805,7 @@ def pagina_tasacion_individual():
                             st.dataframe(contrib_df_prima, width='stretch', height=200, hide_index=True)
                         
                         else:
-                            st.subheader("📈 Contribución a la Tasa")
+                            st.subheader("Contribución a la Tasa")
                             contrib_df_tasa = pd.DataFrame({
                                 'Variable': list(resultados['contrib_tasa'].keys()),
                                 'Impacto en Tasa': [f"{v:+.1f}%" for v in resultados['contrib_tasa'].values()],
@@ -977,7 +973,7 @@ def crear_plantilla_fallback(modelo_tipo: str = "tasa"):
     
 def pagina_tasacion_multiple():
     """Pestaña para cálculo múltiple por lotes - SOLO TASA Y PRIMA"""
-    st.header("📁 Cálculo Múltiple por Lotes")
+    st.header("Cálculo múltiple por lotes")
     
     limite_registros = f"{st.session_state.config_sistema['metricas'].get('limite_registros', 50000)}"
 
@@ -1156,7 +1152,7 @@ def pagina_tasacion_multiple():
                 st.error(f"❌ Error procesando el archivo: {str(e)}")
     
     with col2:
-        st.subheader("📋 Plantilla de Ejemplo")
+        st.subheader("📋 Plantilla de ejemplo")
         
         # Cargar plantilla existente desde assets
         plantilla_path = "assets/plantilla_tasacion_basica.xlsx"
@@ -1265,7 +1261,7 @@ def pagina_documentacion():
     config = st.session_state.config_sistema
     doc_config = config.get('documentacion', {})
     
-    st.header("📚 Documentación Técnica - Modelos ECO 805")
+    st.header("Documentación técnica")
     
     # Introducción desde YAML 
     introduccion = doc_config.get('introduccion', 'Sistema para cálculo de Tasa de Descuento y Prima de Riesgo basado en análisis de regresión múltiple.')
@@ -1277,12 +1273,12 @@ def pagina_documentacion():
     """, unsafe_allow_html=True)
     
     # Metodología desde YAML
-    st.subheader("🔬 Metodología Científica")
+    st.subheader("🔬 Metodología científica")
     
     col_metodo1, col_metodo2 = st.columns(2)
     
     with col_metodo1:
-        st.markdown("**Bases de Datos:**")
+        st.markdown("**Bases de datos:**")
         for item in doc_config.get('metodologia', {}).get('base_datos', []):
             st.write(f"- {item}")
         
@@ -1291,16 +1287,16 @@ def pagina_documentacion():
             st.write(f"- {item}")
     
     with col_metodo2:
-        st.markdown("**Validación Estadística:**")
+        st.markdown("**Validación estadística:**")
         for item in doc_config.get('metodologia', {}).get('validacion', []):
             st.write(f"- {item}")
         
-        st.markdown("**Software Utilizado:**")
+        st.markdown("**Software utilizado:**")
         for item in doc_config.get('metodologia', {}).get('software', []):
             st.write(f"- {item}")
     
     # Modelos matemáticos - SOLO TASA Y PRIMA
-    st.subheader("🧮 Modelos Matemáticos Implementados")
+    st.subheader("🧮 Modelos matemáticos implementados")
     
     tab_model1, tab_model2 = st.tabs(["Tasa Descuento", "Prima Riesgo"])
         
@@ -1314,7 +1310,7 @@ def pagina_documentacion():
         - Tasa libre de riesgo (bonos estado 5 años)
         - Prima de riesgo específica del inmueble
         
-        **Variables Significativas:**
+        **Variables significativas:**
         - **SU**: Superficie construida (efecto positivo marginal)
         - **antig**: Antigüedad del inmueble (efecto positivo - mayor riesgo)
         - **Dnueva**: Vivienda nueva (< 5 años) - dummy
@@ -1337,13 +1333,13 @@ def pagina_documentacion():
         
         $$Prima_i = \\beta_0 + \\sum_{j=1}^{J}\\beta_j X_{ji} + \\epsilon_i$$
         
-        **Factores de Riesgo Considerados:**
+        **Factores de riesgo considerados:**
         - Riesgo de ubicación (municipio)
         - Riesgo por antigüedad y estado
         - Riesgo por características constructivas
         - Riesgo de mercado local
         
-        **Variables Significativas:**
+        **Variables significativas:**
         - **SU**: Superficie construida
         - **antig**: Antigüedad del inmueble (aumenta prima consistentemente)
         - **Dnueva**: Vivienda nueva (< 5 años) - dummy
@@ -1355,7 +1351,7 @@ def pagina_documentacion():
         - **CC_Alta**: Calidad constructiva alta - dummy (efecto variable)
         - **_cons**: Término constante (prima base)
         
-        **Hallazgos Clave:**
+        **Hallazgos clave:**
         - Municipios pequeños: mayor prima por iliquidez
         - Antigüedad: aumenta prima consistentemente
         - Ascensor y buen estado: reducen prima
@@ -1432,9 +1428,9 @@ def main():
     mostrar_sidebar()
     
     tab1, tab2, tab3 = st.tabs([
-        "📚 Documentación Técnica", 
-        "🏠 Cálculo Individual", 
-        "📁 Cálculo por Lotes"
+        "📚 Documentación técnica", 
+        "🏠 Cálculo individual", 
+        "📁 Cálculo por lotes"
     ])
     
     with tab1:
