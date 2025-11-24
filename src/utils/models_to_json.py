@@ -64,18 +64,18 @@ def procesar_todas_hojas(excel_file, output_prefix="modelo"):
 if __name__ == "__main__":
     excel_file = "assets/Coeficientes_modelos.xlsx"
 
-    modelo = excel_to_json(
-        excel_file=excel_file,
-        sheet_name="Testigos_menos de 10.000",
-        output_file="config/modelo_testigos_menos_10000.json"
-    )
+    # modelo = excel_to_json(
+    #     excel_file=excel_file,
+    #     sheet_name="Testigos_menos de 10.000",
+    #     output_file="config/modelo_testigos_menos_10000.json"
+    # )
     
-    print("Estructura generada:")
-    print(json.dumps({
-        "nombre_modelo": modelo["nombre_modelo"],
-        "coeficientes_municipios_ejemplo": dict(list(modelo["coeficientes_municipios"].items())[:3]),
-        "coeficientes_variables": modelo["coeficientes_variables"],
-        "_cons": modelo["_cons"]
-    }, indent=2))
+    # print("Estructura generada:")
+    # print(json.dumps({
+    #     "nombre_modelo": modelo["nombre_modelo"],
+    #     "coeficientes_municipios_ejemplo": dict(list(modelo["coeficientes_municipios"].items())[:3]),
+    #     "coeficientes_variables": modelo["coeficientes_variables"],
+    #     "_cons": modelo["_cons"]
+    # }, indent=2))
     
     resultados = procesar_todas_hojas(excel_file, "config/modelo")

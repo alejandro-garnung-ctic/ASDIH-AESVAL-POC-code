@@ -298,20 +298,21 @@ class ModeloTasacion:
         contribuciones[f'municipio_{codigo_municipio}'] = coef_municipio
         
         # Aplicar coeficientes según variables disponibles usando los coeficientes reales
+        # Solo usar variables que existen en el modelo (variables subrayadas amarillo)
         if 'SU' in coef_variables and coef_variables['SU'] is not None and datos.get('superficie'):
             contrib = coef_variables['SU'] * datos['superficie']
             tasa_base += contrib
             contribuciones['superficie'] = contrib
         
-        if 'antig' in coef_variables and coef_variables['antig'] is not None and datos.get('antiguedad'):
-            contrib = coef_variables['antig'] * datos['antiguedad']
-            tasa_base += contrib
-            contribuciones['antiguedad'] = contrib
-        
         if datos.get('vivienda_nueva') and 'Dnueva' in coef_variables and coef_variables['Dnueva'] is not None:
             contrib = coef_variables['Dnueva']
             tasa_base += contrib
             contribuciones['vivienda_nueva'] = contrib
+        
+        if datos.get('calefaccion') and 'DCA' in coef_variables and coef_variables['DCA'] is not None:
+            contrib = coef_variables['DCA']
+            tasa_base += contrib
+            contribuciones['calefaccion'] = contrib
         
         if 'NB' in coef_variables and coef_variables['NB'] is not None and datos.get('banos'):
             contrib = coef_variables['NB'] * datos['banos']
@@ -328,18 +329,26 @@ class ModeloTasacion:
             tasa_base += contrib
             contribuciones['ascensor'] = contrib
         
-        if datos.get('estado_alto') and 'EC_Alto' in coef_variables and coef_variables['EC_Alto'] is not None:
-            contrib = coef_variables['EC_Alto']
+        if datos.get('calidad_alta') and 'CC_Alta' in coef_variables and coef_variables['CC_Alta'] is not None:
+            contrib = coef_variables['CC_Alta']
             tasa_base += contrib
-            contribuciones['estado_alto'] = contrib
+            contribuciones['calidad_alta'] = contrib
         
-        if datos.get('rehabilitacion') and 'rehab' in coef_variables and coef_variables['rehab'] is not None:
-            contrib = coef_variables['rehab']
+        # Variables sociales y ambientales (dummies: 0 o 1)
+        # creci: 1 si evolución del entorno es creciente, 0 en caso contrario
+        if datos.get('creci') and 'creci' in coef_variables and coef_variables['creci'] is not None:
+            contrib = coef_variables['creci'] * 1  # Dummy: 1 si True, 0 si False
             tasa_base += contrib
-            contribuciones['rehabilitacion'] = contrib
+            contribuciones['creci'] = contrib
         
-        # Asegurar que la tasa esté en un rango razonable
-        tasa_final = max(0.01, min(1.0, tasa_base))
+        # renta: 1 si nivel de renta del entorno es media o alta, 0 en caso contrario
+        if datos.get('renta') and 'renta' in coef_variables and coef_variables['renta'] is not None:
+            contrib = coef_variables['renta'] * 1  # Dummy: 1 si True, 0 si False
+            tasa_base += contrib
+            contribuciones['renta'] = contrib
+        
+        # No aplicar thresholding - usar el valor calculado directamente
+        tasa_final = tasa_base
         
         # CALCULAR PORCENTAJES RELATIVOS
         contribuciones_porcentaje = {}
@@ -376,20 +385,21 @@ class ModeloTasacion:
         contribuciones[f'municipio_{codigo_municipio}'] = coef_municipio
         
         # Aplicar coeficientes según variables disponibles usando los coeficientes reales
+        # Solo usar variables que existen en el modelo (variables subrayadas amarillo)
         if 'SU' in coef_variables and coef_variables['SU'] is not None and datos.get('superficie'):
             contrib = coef_variables['SU'] * datos['superficie']
             prima_base += contrib
             contribuciones['superficie'] = contrib
         
-        if 'antig' in coef_variables and coef_variables['antig'] is not None and datos.get('antiguedad'):
-            contrib = coef_variables['antig'] * datos['antiguedad']
-            prima_base += contrib
-            contribuciones['antiguedad'] = contrib
-        
         if datos.get('vivienda_nueva') and 'Dnueva' in coef_variables and coef_variables['Dnueva'] is not None:
             contrib = coef_variables['Dnueva']
             prima_base += contrib
             contribuciones['vivienda_nueva'] = contrib
+        
+        if datos.get('calefaccion') and 'DCA' in coef_variables and coef_variables['DCA'] is not None:
+            contrib = coef_variables['DCA']
+            prima_base += contrib
+            contribuciones['calefaccion'] = contrib
         
         if 'NB' in coef_variables and coef_variables['NB'] is not None and datos.get('banos'):
             contrib = coef_variables['NB'] * datos['banos']
@@ -406,18 +416,13 @@ class ModeloTasacion:
             prima_base += contrib
             contribuciones['ascensor'] = contrib
         
-        if datos.get('estado_alto') and 'EC_Alto' in coef_variables and coef_variables['EC_Alto'] is not None:
-            contrib = coef_variables['EC_Alto']
+        if datos.get('calidad_alta') and 'CC_Alta' in coef_variables and coef_variables['CC_Alta'] is not None:
+            contrib = coef_variables['CC_Alta']
             prima_base += contrib
-            contribuciones['estado_alto'] = contrib
+            contribuciones['calidad_alta'] = contrib
         
-        if datos.get('rehabilitacion') and 'rehab' in coef_variables and coef_variables['rehab'] is not None:
-            contrib = coef_variables['rehab']
-            prima_base += contrib
-            contribuciones['rehabilitacion'] = contrib
-        
-        # Asegurar que la prima esté en un rango razonable
-        prima_final = max(0.01, min(1.0, prima_base))
+        # No aplicar thresholding - usar el valor calculado directamente
+        prima_final = prima_base
         
         # CALCULAR PORCENTAJES RELATIVOS
         contribuciones_porcentaje = {}
@@ -448,11 +453,11 @@ def inicializar_session_state():
             'calidad_alta': False,
             'vivienda_nueva': False,
             'calefaccion': True,
-            'antiguedad': 15,
-            'rehabilitacion': False,
-            'estado_conservacion': "Buena",
+            'creci': False,
+            'renta': False,
             'codigo_municipio': '2005', 
-            'modelo_seleccionado': 'testigos_tasa' 
+            'modelo_seleccionado': 'testigos_tasa',
+            'ocultar_variables_no_correspondientes': False 
         }
 
 def mostrar_header():
@@ -641,30 +646,51 @@ def pagina_tasacion_individual():
                 )
                 
                 # CAMPOS PARA MODELOS DE TASA/PRIMA
-                antiguedad = st.number_input(
-                    "Antigüedad (años)", 
-                    min_value=0, 
-                    max_value=200,
-                    value=datos_persistentes.get('antiguedad', 15),
-                    help="Años desde la construcción del inmueble (variable antig)",
-                    key="input_antiguedad"
+                calefaccion = st.checkbox(
+                    "Calefacción", 
+                    value=datos_persistentes.get('calefaccion', True),
+                    help="¿El inmueble tiene calefacción? (variable DCA)",
+                    key="input_calefaccion"
                 )
                 
-                rehabilitacion = st.checkbox(
-                    "Rehabilitación del edificio", 
-                    value=datos_persistentes.get('rehabilitacion', False),
-                    help="¿El edificio ha sido rehabilitado? (variable rehab)",
-                    key="input_rehabilitacion"
+                # Toggle para controlar si se ocultan variables que no corresponden al modelo
+                ocultar_variables = st.checkbox(
+                    "Ocultar variables no correspondientes al modelo",
+                    value=datos_persistentes.get('ocultar_variables_no_correspondientes', True),
+                    help="Si está activado, oculta las variables que no se usan en el modelo seleccionado. Si está desactivado, muestra todas las variables pero solo usa las correspondientes en el cálculo.",
+                    key="input_ocultar_variables"
                 )
                 
-                estado_conservacion = st.select_slider(
-                    "Estado de conservación",
-                    options=["Muy deficiente", "Deficiente", "Regular", "Buena", "Muy buena", "Óptima"],
-                    value=datos_persistentes.get('estado_conservacion', "Buena"),
-                    help="Estado general de conservación del inmueble (variable EC_Alto)",
-                    key="input_estado_conservacion_tasa"
-                )
-            
+                # Actualizar datos persistentes cuando cambia el toggle
+                if ocultar_variables != datos_persistentes.get('ocultar_variables_no_correspondientes'):
+                    st.session_state.datos_persistentes['ocultar_variables_no_correspondientes'] = ocultar_variables
+                
+                # Variables sociales y ambientales (creci y renta solo para modelo de tasa)
+                # Son variables dummy (0 o 1)
+                # Mostrar según el toggle y el modelo
+                mostrar_creci_renta = not ocultar_variables or es_modelo_tasa
+                
+                if mostrar_creci_renta:
+                    creci = st.checkbox(
+                        "Evolución del entorno creciente (creci)", 
+                        value=datos_persistentes.get('creci', False),
+                        help="Variable dummy: 1 si la evolución del entorno es creciente, 0 en caso contrario" + (" - Solo para modelo Tasa" if not es_modelo_tasa else ""),
+                        key="input_creci",
+                        disabled=(not es_modelo_tasa and ocultar_variables)
+                    )
+                    
+                    renta = st.checkbox(
+                        "Nivel de renta media o alta (renta)", 
+                        value=datos_persistentes.get('renta', False),
+                        help="Variable dummy: 1 si el nivel de renta del entorno es media o alta, 0 en caso contrario" + (" - Solo para modelo Tasa" if not es_modelo_tasa else ""),
+                        key="input_renta",
+                        disabled=(not es_modelo_tasa and ocultar_variables)
+                    )
+                else:
+                    # Para modelo prima cuando está oculto, usar valores por defecto (no se usan en el cálculo)
+                    creci = False
+                    renta = False
+                
             with col1_2:
                 # CAMPOS COMUNES (continuación)
                 planta = st.number_input(
@@ -728,16 +754,19 @@ def pagina_tasacion_individual():
                     # Preparar datos para tasa/prima
                     datos_inmueble = {
                         'superficie': superficie,
-                        'antiguedad': antiguedad,
                         'dormitorios': dormitorios,
                         'banos': banos,
                         'planta': planta,
                         'ascensor': ascensor,
-                        'rehabilitacion': rehabilitacion,
+                        'calefaccion': calefaccion,
                         'calidad_alta': calidad_alta,
-                        'estado_alto': estado_conservacion in ["Buena", "Muy buena", "Óptima"],
                         'vivienda_nueva': vivienda_nueva
                     }
+                    
+                    # Solo añadir creci y renta para modelo de tasa
+                    if es_modelo_tasa:
+                        datos_inmueble['creci'] = creci
+                        datos_inmueble['renta'] = renta
                     
                     # CALCULAR SÓLO LO QUE CORRESPONDA AL MODELO SELECCIONADO
                     resultados = {}
@@ -851,7 +880,8 @@ def validar_fila_para_modelo(fila: pd.Series, modelo_clave: str) -> Tuple[bool, 
     columnas_requeridas_base = ['codigo_municipio', 'superficie', 'dormitorios', 'banos', 'planta']
     
     # Columnas específicas por tipo de modelo - SOLO TASA/PRIMA
-    columnas_requeridas = columnas_requeridas_base + ['antiguedad', 'ascensor', 'rehabilitacion', 'calidad_alta', 'estado_conservacion']
+    # Nota: Las variables sociales/ambientales (creci, renta) son opcionales
+    columnas_requeridas = columnas_requeridas_base + ['ascensor', 'calefaccion', 'calidad_alta', 'vivienda_nueva']
     
     # Verificar columnas requeridas
     for columna in columnas_requeridas:
@@ -894,16 +924,29 @@ def procesar_fila_multiple(fila: pd.Series, modelo_tasacion, modelo_seleccionado
         # Modelo de tasa o prima
         datos = {
             'superficie': superficie,
-            'antiguedad': float(fila.get('antiguedad', 0)),
             'dormitorios': int(fila.get('dormitorios', 0)),
             'banos': int(fila.get('banos', 0)),
             'planta': int(fila.get('planta', 0)),
             'ascensor': bool(fila.get('ascensor', False)),
-            'rehabilitacion': bool(fila.get('rehabilitacion', False)),
+            'calefaccion': bool(fila.get('calefaccion', True)),
             'calidad_alta': bool(fila.get('calidad_alta', False)),
-            'estado_alto': str(fila.get('estado_conservacion', '')).lower() in ["buena", "muy buena", "óptima"],
             'vivienda_nueva': bool(fila.get('vivienda_nueva', False))
         }
+        
+        # Solo añadir creci y renta para modelo de tasa (variables dummy: 0 o 1)
+        if modelo_seleccionado == 'testigos_tasa':
+            # Convertir a booleano: True si es 1, True, "Sí", etc., False en caso contrario
+            creci_val = fila.get('creci', False)
+            if pd.notna(creci_val):
+                datos['creci'] = bool(creci_val) if isinstance(creci_val, (bool, int, float)) else str(creci_val).lower() in ['true', '1', 'sí', 'si', 'yes', 'verdadero']
+            else:
+                datos['creci'] = False
+            
+            renta_val = fila.get('renta', False)
+            if pd.notna(renta_val):
+                datos['renta'] = bool(renta_val) if isinstance(renta_val, (bool, int, float)) else str(renta_val).lower() in ['true', '1', 'sí', 'si', 'yes', 'verdadero']
+            else:
+                datos['renta'] = False
         
         if modelo_seleccionado == 'testigos_tasa':
             resultado, contribuciones, mensaje_error = modelo_tasacion.calcular_tasa_descuento(datos, codigo_municipio)
@@ -944,12 +987,12 @@ def crear_plantilla_fallback(modelo_tipo: str = "tasa"):
         'dormitorios': [3, 4, 2],
         'banos': [2, 3, 1],
         'planta': [2, 3, 1],
-        'antiguedad': [15, 20, 10],
         'ascensor': [True, True, False],
-        'rehabilitacion': [False, True, False],
+        'calefaccion': [True, True, False],
         'calidad_alta': [False, True, False],
-        'estado_conservacion': ['Buena', 'Muy buena', 'Regular'],
-        'vivienda_nueva': [False, True, False]
+        'vivienda_nueva': [False, True, False],
+        'creci': [True, False, True],
+        'renta': [True, True, False]
     }
     
     df_fallback = pd.DataFrame(sample_data)
@@ -992,12 +1035,14 @@ def pagina_tasacion_multiple():
         - `dormitorios`: Número de dormitorios
         - `banos`: Número de baños
         - `planta`: Planta del inmueble
-        - `antiguedad`: Antigüedad en años
         - `ascensor`: Sí/No o 1/0
-        - `rehabilitacion`: Sí/No o 1/0
+        - `calefaccion`: Sí/No o 1/0
         - `calidad_alta`: Sí/No o 1/0
-        - `estado_conservacion`: Texto (Muy deficiente, Deficiente, Regular, Buena, Muy buena, Óptima)
         - `vivienda_nueva`: Sí/No o 1/0
+        
+        **Columnas opcionales (solo para modelo Tasa):**
+        - `creci`: Variable dummy - 1/True/Sí si la evolución del entorno es creciente, 0/False/No en caso contrario - Solo se usa en modelo Tasa
+        - `renta`: Variable dummy - 1/True/Sí si el nivel de renta del entorno es media o alta, 0/False/No en caso contrario - Solo se usa en modelo Tasa
         """)
     
     col1, col2 = st.columns([2, 1])
@@ -1203,7 +1248,7 @@ def pagina_tasacion_multiple():
         st.markdown("### 💡 Consejos para el formato")
         st.write("• **Formato Excel**: Use .xlsx para mejor compatibilidad")
         st.write("• **Booleanos**: Use VERDADERO/FALSO, True/False, Sí/No, o 1/0")
-        st.write("• **Estado conservación**: Use Muy deficiente, Deficiente, Regular, Buena, Muy buena, u Óptima")
+        st.write("• **Variables dummy**: Use 1/0, True/False, o Sí/No para creci y renta (solo para modelo Tasa)")
         st.write("• **Codificación**: UTF-8 para caracteres especiales")
 
 # Funciones auxiliares para el procesamiento múltiple
@@ -1311,15 +1356,15 @@ def pagina_documentacion():
         - Prima de riesgo específica del inmueble
         
         **Variables significativas:**
-        - **SU**: Superficie construida (efecto positivo marginal)
-        - **antig**: Antigüedad del inmueble (efecto positivo - mayor riesgo)
+        - **SU**: Superficie construida
         - **Dnueva**: Vivienda nueva (< 5 años) - dummy
-        - **NB**: Número de baños (efecto negativo - reduce riesgo)
+        - **DCA**: Calefacción - dummy
+        - **NB**: Número de baños
         - **ND**: Número de dormitorios
-        - **DAS**: Ascensor (efecto negativo - reduce riesgo)
-        - **EC_Alto**: Estado de conservación alto (efecto negativo - reduce riesgo)
-        - **rehab**: Rehabilitación del edificio - dummy
+        - **DAS**: Ascensor - dummy
         - **CC_Alta**: Calidad constructiva alta - dummy
+        - **creci**: Variable dummy - 1 si la evolución del entorno es creciente, 0 en caso contrario
+        - **renta**: Variable dummy - 1 si el nivel de renta del entorno es media o alta, 0 en caso contrario
         - **_cons**: Término constante (tasa base)
         """)
         
@@ -1341,21 +1386,18 @@ def pagina_documentacion():
         
         **Variables significativas:**
         - **SU**: Superficie construida
-        - **antig**: Antigüedad del inmueble (aumenta prima consistentemente)
         - **Dnueva**: Vivienda nueva (< 5 años) - dummy
+        - **DCA**: Calefacción - dummy
         - **NB**: Número de baños
         - **ND**: Número de dormitorios
-        - **DAS**: Ascensor (reduce prima)
-        - **EC_Alto**: Estado de conservación alto (reduce prima)
-        - **rehab**: Rehabilitación del edificio - dummy
-        - **CC_Alta**: Calidad constructiva alta - dummy (efecto variable)
+        - **DAS**: Ascensor - dummy
+        - **CC_Alta**: Calidad constructiva alta - dummy
         - **_cons**: Término constante (prima base)
         
         **Hallazgos clave:**
         - Municipios pequeños: mayor prima por iliquidez
-        - Antigüedad: aumenta prima consistentemente
-        - Ascensor y buen estado: reducen prima
-        - Calidad constructiva: efecto variable
+        - Ascensor y calidad constructiva: reducen prima
+        - Calefacción: efecto en la prima
         """)
 
     # st.subheader("🏙️ Segmentación por Tamaño Municipal")
