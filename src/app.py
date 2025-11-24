@@ -347,8 +347,9 @@ class ModeloTasacion:
             tasa_base += contrib
             contribuciones['renta'] = contrib
         
-        # No aplicar thresholding - usar el valor calculado directamente
-        tasa_final = tasa_base
+        # Convertir a porcentaje (los valores del modelo están en escala 100x mayor)
+        # Dividir por 100 para obtener el valor en porcentaje decimal (0.087 = 8.7%)
+        tasa_final = tasa_base / 100.0
         
         # CALCULAR PORCENTAJES RELATIVOS
         contribuciones_porcentaje = {}
@@ -421,8 +422,9 @@ class ModeloTasacion:
             prima_base += contrib
             contribuciones['calidad_alta'] = contrib
         
-        # No aplicar thresholding - usar el valor calculado directamente
-        prima_final = prima_base
+        # Convertir a porcentaje (los valores del modelo están en escala 100x mayor)
+        # Dividir por 100 para obtener el valor en porcentaje decimal (0.054 = 5.4%)
+        prima_final = prima_base / 100.0
         
         # CALCULAR PORCENTAJES RELATIVOS
         contribuciones_porcentaje = {}
