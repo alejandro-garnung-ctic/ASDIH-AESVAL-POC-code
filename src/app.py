@@ -655,21 +655,11 @@ def pagina_tasacion_individual():
                     key="input_calefaccion"
                 )
                 
-                # Toggle para controlar si se ocultan variables que no corresponden al modelo
-                ocultar_variables = st.checkbox(
-                    "Ocultar variables no correspondientes al modelo",
-                    value=datos_persistentes.get('ocultar_variables_no_correspondientes', True),
-                    help="Si está activado, oculta las variables que no se usan en el modelo seleccionado. Si está desactivado, muestra todas las variables pero solo usa las correspondientes en el cálculo.",
-                    key="input_ocultar_variables"
-                )
-                
-                # Actualizar datos persistentes cuando cambia el toggle
-                if ocultar_variables != datos_persistentes.get('ocultar_variables_no_correspondientes'):
-                    st.session_state.datos_persistentes['ocultar_variables_no_correspondientes'] = ocultar_variables
                 
                 # Variables sociales y ambientales (creci y renta solo para modelo de tasa)
                 # Son variables dummy (0 o 1)
-                # Mostrar según el toggle y el modelo
+                # Controlar visibilidad mediante código (no checkbox)
+                ocultar_variables = datos_persistentes.get('ocultar_variables_no_correspondientes', False)
                 mostrar_creci_renta = not ocultar_variables or es_modelo_tasa
                 
                 if mostrar_creci_renta:
