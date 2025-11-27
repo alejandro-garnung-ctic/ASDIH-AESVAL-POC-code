@@ -107,17 +107,13 @@ La aplicación estará disponible en:
 
 👉 **[http://localhost:8502](http://localhost:8502)**
 
----
-
-## 📜 Ver los logs de la aplicación
+## Ver los logs de la aplicación
 
 ```bash
 docker compose logs -f tasacion-app
 ```
 
 > `tasacion-app` es el nombre del servicio definido en tu `docker-compose.yml`.
-
----
 
 ## Detener la aplicación (sin eliminar contenedores)
 
