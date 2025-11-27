@@ -48,25 +48,104 @@ Sistema web para cálculo de **Tasa de Descuento** y **Prima de Riesgo** de inmu
 - **EC_Alto**: Estado de conservación alto (booleano)
 - **rehab**: Rehabilitación del edificio (booleano)
 
-## Instalación y Despliegue
+## 🚀 Instalación y Despliegue
 
-### Con Docker Compose (Recomendado)
+### 📦 Requisitos Previos
+
+* **Docker Desktop** instalado (Windows, macOS o Linux).
+* En **Windows**, Docker funciona mediante **WSL2 (subsistema de Linux)**.
+
+  * Al instalar Docker Desktop, este configura automáticamente un entorno Linux en el que corren los contenedores.
+  * Los comandos `docker` y `docker compose` se ejecutan desde **PowerShell**, **CMD**, **Terminal de Windows** o **WSL**.
+
+> **Importante en Windows:**
+> Evita rutas con espacios, especialmente cuando montes volúmenes.
+> Ejemplo recomendado: `C:\Users\usuario\proyecto\tasacion-app`
+> **No recomendado:** `C:\Users\Mi Carpeta con Espacios\proyecto`
+
+## 🛠️ Despliegue con Docker Compose (Recomendado)
+
+Asegúrate de ejecutar los comandos desde el directorio donde se encuentra tu archivo **`docker-compose.yml`** (la raíz del proyecto).
+
+### 1. Detener y eliminar contenedores previos (opcional pero recomendado)
 
 ```bash
-docker-compose down
-docker-compose build --no-cache
-docker-compose up
+docker compose down
 ```
-La aplicación estará disponible en: `http://localhost:8502`
 
-Para ver los logs de la aplicación:
+Si también quieres **eliminar volúmenes y redes asociadas**:
+
+```bash
+docker compose down --volumes --remove-orphans
+```
+
+### 2. Reconstruir la imagen (opcional)
+
+Si cambiaste el Dockerfile o dependencias de la app:
+
+```bash
+docker compose build --no-cache
+```
+
+### 3. Levantar la aplicación
+
+#### Modo normal (mostrando logs en la terminal)
+
+```bash
+docker compose up
+```
+
+#### Modo *detached* (en segundo plano) (RECOMENDADO)
+
+```bash
+docker compose up -d
+```
+
+> Útil para que la terminal quede libre mientras la app sigue corriendo.
+
+La aplicación estará disponible en:
+
+👉 **[http://localhost:8502](http://localhost:8502)**
+
+---
+
+## 📜 Ver los logs de la aplicación
 
 ```bash
 docker compose logs -f tasacion-app
 ```
 
-> [!WARNING]
-> Se recomienda que la aplicación se ejecute en una ruta que no contenga espacios, e.g. `C:\User\Desktop\folder`.
+> `tasacion-app` es el nombre del servicio definido en tu `docker-compose.yml`.
+
+---
+
+## Detener la aplicación (sin eliminar contenedores)
+
+```bash
+docker compose stop
+```
+
+## Eliminar contenedores sin bajar toda la stack
+
+Eliminar solo un servicio:
+
+```bash
+docker compose rm tasacion-app
+```
+
+Eliminar todos los contenedores definidos:
+
+```bash
+docker compose rm
+```
+
+(Pedirá confirmación; usa `-f` para forzar)
+
+## ♻️ Reiniciar rápidamente el servicio
+
+```bash
+docker compose restart
+```
 
 ### Desarrollo Local
 
